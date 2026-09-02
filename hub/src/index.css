@@ -1,0 +1,173 @@
+@import "tailwindcss";
+
+@theme {
+  --font-teko: 'Teko', sans-serif;
+  --font-inter: 'Inter', sans-serif;
+}
+
+@layer base {
+  body {
+    background-color: #060709;
+    color: #d1d2d5;
+    font-family: 'Inter', sans-serif;
+  }
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Teko', sans-serif;
+  }
+  * { box-sizing: border-box; }
+}
+
+/* ── GRID CIRCUIT TEXTURE ─── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.015) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.015) 1px, transparent 1px);
+  background-size: 60px 60px;
+}
+
+/* ── SCROLLBARS ────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.3); }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+
+/* ── KEYFRAMES ──────────────────────── */
+@keyframes car-race {
+  0%   { transform: translateX(-200px); opacity: 0; }
+  5%   { opacity: 1; }
+  92%  { opacity: 1; }
+  100% { transform: translateX(calc(100vw + 200px)); opacity: 0; }
+}
+
+@keyframes speed-line {
+  0%   { transform: scaleX(0) translateX(-100%); opacity: 0; }
+  20%  { opacity: 0.6; }
+  100% { transform: scaleX(1) translateX(0); opacity: 0; }
+}
+
+@keyframes critical-flash {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes float-up {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-in-right {
+  from { opacity: 0; transform: translateX(24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes telemetry-pulse {
+  0%, 100% { box-shadow: 0 0 8px rgba(225,6,0,0.3); border-color: rgba(225,6,0,0.5); }
+  50%       { box-shadow: 0 0 28px rgba(225,6,0,0.9); border-color: rgba(225,6,0,1); }
+}
+
+@keyframes glow-pulse-red {
+  0%, 100% { box-shadow: 0 0 12px rgba(225,6,0,0.3); }
+  50%       { box-shadow: 0 0 35px rgba(225,6,0,0.8); }
+}
+
+@keyframes glow-pulse-cyan {
+  0%, 100% { box-shadow: 0 0 12px rgba(0,210,190,0.25); }
+  50%       { box-shadow: 0 0 30px rgba(0,210,190,0.6); }
+}
+
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes spark {
+  0%   { transform: scaleX(0); opacity: 1; }
+  100% { transform: scaleX(1); opacity: 0; }
+}
+
+@keyframes landing-glow {
+  0%, 100% { text-shadow: 0 0 40px rgba(225,6,0,0.4), 0 0 80px rgba(225,6,0,0.2); }
+  50%       { text-shadow: 0 0 80px rgba(225,6,0,0.8), 0 0 120px rgba(225,6,0,0.4); }
+}
+
+@keyframes bg-pulse {
+  0%, 100% { opacity: 0.12; }
+  50%       { opacity: 0.22; }
+}
+
+/* ── UTILITY ─────────────────── */
+.float-up   { animation: float-up 0.35s ease-out both; }
+.slide-in-r { animation: slide-in-right 0.3s ease-out both; }
+.pulse-alert-box { animation: telemetry-pulse 1.4s infinite; }
+.critical-flash  { animation: critical-flash 0.8s infinite; }
+.glow-red        { animation: glow-pulse-red 2s ease-in-out infinite; }
+.glow-cyan       { animation: glow-pulse-cyan 2.5s ease-in-out infinite; }
+
+/* ── GLASS CARD ─────────────── */
+.glass-card {
+  background: rgba(10,11,16,0.75);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 1.25rem;
+}
+.glass-card-bright {
+  background: rgba(14,16,22,0.9);
+  backdrop-filter: blur(24px);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 1.25rem;
+}
+
+/* ── DECISION BUTTONS ─────────── */
+.btn-push-active   { background: linear-gradient(135deg,#dc2626,#b91c1c); box-shadow:0 0 24px rgba(220,38,38,0.5); border-color:rgba(239,68,68,0.7); color:white; }
+.btn-save-active   { background: linear-gradient(135deg,#059669,#047857); box-shadow:0 0 24px rgba(5,150,105,0.5); border-color:rgba(52,211,153,0.7); color:white; }
+.btn-defend-active { background: linear-gradient(135deg,#d97706,#b45309); box-shadow:0 0 24px rgba(217,119,6,0.5); border-color:rgba(251,191,36,0.7); color:white; }
+.btn-pit-active    { background: linear-gradient(135deg,#0891b2,#0e7490); box-shadow:0 0 24px rgba(8,145,178,0.5); border-color:rgba(34,211,238,0.7); color:white; }
+
+/* ── BADGES ─────────────────── */
+.badge-critical { background: linear-gradient(135deg,#ef4444,#dc2626); color:white; animation: critical-flash 1s infinite; }
+.badge-high     { background: linear-gradient(135deg,#f59e0b,#d97706); color:#1a0a00; }
+.badge-medium   { background: rgba(99,102,241,0.2); border:1px solid rgba(99,102,241,0.4); color:#a5b4fc; }
+.badge-low      { background: rgba(255,255,255,0.08); border:1px solid rgba(255,255,255,0.12); color:#9ca3af; }
+
+/* ── LEADERBOARD ─────────────── */
+.lb-podium-1 { background:linear-gradient(90deg,rgba(255,215,0,0.08),transparent); border-left:2px solid #ffd700; }
+.lb-podium-2 { background:linear-gradient(90deg,rgba(192,192,192,0.06),transparent); border-left:2px solid #c0c0c0; }
+.lb-podium-3 { background:linear-gradient(90deg,rgba(205,127,50,0.06),transparent); border-left:2px solid #cd7f32; }
+
+/* ── LANDING CAR ANIMATION ─── */
+.f1-car-container {
+  position: absolute;
+  bottom: 22%;
+  left: 0;
+  width: 100%;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 10;
+}
+.f1-car {
+  display: inline-block;
+  animation: car-race 5s cubic-bezier(0.4,0,0.2,1) infinite;
+  animation-delay: 0.5s;
+  white-space: nowrap;
+}
+.speed-lines {
+  position: absolute;
+  bottom: 24%;
+  left: 0;
+  width: 100%;
+  pointer-events: none;
+  z-index: 9;
+}
+.speed-line {
+  height: 2px;
+  margin: 3px 0;
+  background: linear-gradient(90deg, transparent, rgba(225,6,0,0.6), transparent);
+  transform-origin: left center;
+  animation: speed-line 5s ease-in-out infinite;
+}
