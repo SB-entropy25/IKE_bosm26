@@ -6,15 +6,19 @@ interface PhaseRegistrationProps {
   onComplete: (principalName: string, teamName: string) => void;
   supabaseConnected: boolean;
   onOpenConfig: () => void;
+  initialPrincipalName?: string;
+  initialTeamName?: string;
 }
 
 export const PhaseRegistration: React.FC<PhaseRegistrationProps> = ({
   onComplete,
   supabaseConnected,
   onOpenConfig,
+  initialPrincipalName = '',
+  initialTeamName = '',
 }) => {
-  const [principalName, setPrincipalName] = useState('');
-  const [teamName, setTeamName] = useState('');
+  const [principalName, setPrincipalName] = useState(initialPrincipalName);
+  const [teamName, setTeamName] = useState(initialTeamName);
   const [activeTab, setActiveTab] = useState<'briefing' | 'rules' | 'scoring'>('briefing');
   const [error, setError] = useState('');
 

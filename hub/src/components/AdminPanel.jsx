@@ -8,12 +8,19 @@ export function AdminPanel({ onLogout }) {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState('main')
+  
+  const [adminList, setAdminList] = useState([])
+  const [newAdminEmail, setNewAdminEmail] = useState('')
 
   // Fetch initial data
   const fetchData = async () => {
     // Settings
     const { data: setts } = await supabase.from('hub_settings').select('*').single()
     if (setts) setSettings(setts)
+
+    // Admin Users
+    const { data: admins } = await supabase.from('admin_users').select('*')
+    if (admins) setAdminList(admins)
 
     // Users and scores
     const { data: hubUsers } = await supabase.from('hub_users').select('*')
@@ -41,6 +48,31 @@ export function AdminPanel({ onLogout }) {
       setUsers(combined)
     }
     setLoading(false)
+  }
+
+  const handleAddAdmin = async (e) => {
+    e.preventDefault()
+    if (!newAdminEmail.trim()) return
+    await supabase.from('admin_users').insert([{ email: newAdminEmail.trim() }])
+    setNewAdminEmail('')
+    fetchData()
+  }
+
+  const MASTER_ADMIN = 'f20250844@pilani.bits-pilani.ac.in'
+
+  const handleRemoveAdmin = async (email) => {
+    if (email === MASTER_ADMIN) {
+      alert('This is the master admin account and cannot be removed.')
+      return
+    }
+    if (confirm(`Remove admin access for ${email}?`)) {
+      await supabase.from('admin_users').delete().eq('email', email)
+      fetchData()
+    }
+  }
+
+  const toggleAnyEmail = async () => {
+    await supabase.from('hub_settings').update({ allow_any_email: !settings.allow_any_email }).eq('id', 1)
   }
 
   useEffect(() => {
@@ -89,7 +121,7 @@ export function AdminPanel({ onLogout }) {
   return (
     <div className="min-h-screen p-6 bg-slate-950 text-gray-200 font-inter">
       <nav className="flex justify-between items-center mb-8 pb-4 border-b border-slate-800">
-        <h1 className="font-teko text-4xl font-bold text-white tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500">RACE DIRECTOR DASHBOARD</h1>
+        <h1 className="font-teko text-4xl font-bold text-white tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-red-500 to-amber-500">Quiz Managment Dashboard</h1>
         <div className="flex gap-4">
           <button onClick={exportCSV} className="flex items-center gap-2 bg-emerald-600 hover:bg-emerald-700 px-4 py-2 rounded-lg text-sm font-semibold transition text-white">
             <Download className="w-4 h-4" /> Export Results
@@ -167,6 +199,61 @@ export function AdminPanel({ onLogout }) {
               </div>
             </div>
           </div>
+
+          {/* Admins Management */}
+          <div className="p-6 bg-slate-900 border border-slate-700 rounded-2xl shadow-xl">
+            <h3 className="font-teko text-2xl font-bold text-white mb-4">ADMIN ACCESS</h3>
+            
+            {/* Open Access Toggle */}
+            <div className={`flex items-center justify-between p-3 rounded-xl border mb-4 ${settings.allow_any_email ? 'bg-amber-900/20 border-amber-600/50' : 'bg-slate-950 border-slate-800'}`}>
+              <div>
+                <div className="text-sm font-bold text-white">Open Access Mode</div>
+                <div className="text-xs text-gray-400 mt-0.5">
+                  {settings.allow_any_email ? '⚠️ ANY Google account can register' : '✅ BITS Pilani emails only'}
+                </div>
+              </div>
+              <button
+                onClick={toggleAnyEmail}
+                className={`px-4 py-1.5 rounded-lg text-xs font-bold uppercase transition ${settings.allow_any_email ? 'bg-amber-600 hover:bg-amber-700 text-white' : 'bg-slate-700 hover:bg-slate-600 text-white'}`}
+              >
+                {settings.allow_any_email ? 'Disable' : 'Enable'}
+              </button>
+            </div>
+
+            <p className="text-xs text-gray-400 mb-4">Authorized Google emails for Race Control.</p>
+            
+            <form onSubmit={handleAddAdmin} className="flex gap-2 mb-4">
+              <input 
+                type="email" 
+                value={newAdminEmail}
+                onChange={(e) => setNewAdminEmail(e.target.value)}
+                placeholder="New admin email..."
+                className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-red-500"
+                required
+              />
+              <button type="submit" className="bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-lg text-sm font-bold transition">
+                Add
+              </button>
+            </form>
+
+            <div className="space-y-2 max-h-40 overflow-y-auto custom-scrollbar pr-2">
+              {adminList.map(admin => (
+                <div key={admin.id} className={`flex justify-between items-center border p-3 rounded-lg text-sm ${admin.email === MASTER_ADMIN ? 'bg-red-950/20 border-red-800/50' : 'bg-slate-950 border-slate-800'}`}>
+                  <div className="flex items-center gap-2">
+                    {admin.email === MASTER_ADMIN && <span className="text-red-500 text-xs" title="Master Admin - Protected">🔒</span>}
+                    <span className="text-gray-300 font-mono text-xs">{admin.email}</span>
+                  </div>
+                  <button 
+                    onClick={() => handleRemoveAdmin(admin.email)}
+                    className={`transition ${admin.email === MASTER_ADMIN ? 'text-gray-700 cursor-not-allowed' : 'text-gray-600 hover:text-red-500'}`}
+                    title={admin.email === MASTER_ADMIN ? 'Master admin cannot be removed' : 'Remove access'}
+                  >
+                    &times;
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Right Col: Leaderboard */}
@@ -184,6 +271,7 @@ export function AdminPanel({ onLogout }) {
                 <tr>
                   <th className="py-3 px-4 w-12 text-center">Pos</th>
                   <th className="py-3 px-4">Driver</th>
+                  <th className="py-3 px-4">Email</th>
                   <th className="py-3 px-4 text-right">Speed Pts</th>
                   <th className="py-3 px-4 text-right">Strategy Pts</th>
                   <th className="py-3 px-4 text-right text-amber-400 font-bold">NET SCORE</th>
@@ -191,7 +279,7 @@ export function AdminPanel({ onLogout }) {
               </thead>
               <tbody>
                 {users.length === 0 && (
-                  <tr><td colSpan="5" className="text-center py-8 text-gray-500">Grid is empty. Waiting for registrations.</td></tr>
+                  <tr><td colSpan="6" className="text-center py-8 text-gray-500">Grid is empty. Waiting for registrations.</td></tr>
                 )}
                 {users.map((u, i) => (
                   <tr key={u.id} className="border-b border-slate-800/50 hover:bg-slate-800/50 transition">
@@ -202,6 +290,7 @@ export function AdminPanel({ onLogout }) {
                       <div className="font-semibold text-white">{u.name}</div>
                       <div className="text-xs text-gray-500 font-mono">{u.bits_id}</div>
                     </td>
+                    <td className="py-3 px-4 text-xs text-gray-400 font-mono">{u.email || '—'}</td>
                     <td className="py-3 px-4 text-right text-red-300">{u.speedScore}</td>
                     <td className="py-3 px-4 text-right text-cyan-300">{u.strategyScore}</td>
                     <td className="py-3 px-4 text-right font-bold text-amber-400 text-base">{u.netScore}</td>

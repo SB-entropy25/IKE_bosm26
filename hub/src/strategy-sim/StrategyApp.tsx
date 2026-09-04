@@ -26,7 +26,7 @@ import {
 } from 'lucide-react';
 
 export const App: React.FC<{ user?: any, onExit?: () => void }> = ({ user, onExit }) => {
-  const [phase, setPhase] = useState<AppPhase>(user ? 'quiz' : 'registration');
+  const [phase, setPhase] = useState<AppPhase>('registration');
   const [principalName, setPrincipalName] = useState<string>(user ? user.name : '');
   const [teamName, setTeamName] = useState<string>(user ? 'BITS Team' : '');
   const [teamId, setTeamId] = useState<string>(user ? user.bitsId : '');
@@ -106,9 +106,11 @@ export const App: React.FC<{ user?: any, onExit?: () => void }> = ({ user, onExi
          // Hub Integration: Save directly to unified strategy_scores table using Supabase client
          await supabase.from('strategy_scores').upsert({
             bits_id: user.bitsId,
+            principal_name: principalName,
+            team_name: teamName,
             score: breakdown.total_score,
             updated_at: new Date().toISOString()
-         });
+         }, { onConflict: 'bits_id' });
       } else {
          // Standalone F1 fallback
          const participant: ParticipantRecord = {
@@ -136,7 +138,7 @@ export const App: React.FC<{ user?: any, onExit?: () => void }> = ({ user, onExi
   const handleRestart = () => {
     setRaceState(createInitialRaceState());
     setDecisionHistory([]);
-    setPhase(user ? 'quiz' : 'registration');
+    setPhase('registration');
   };
 
   return (
@@ -152,7 +154,7 @@ export const App: React.FC<{ user?: any, onExit?: () => void }> = ({ user, onExi
               </button>
             )}
             <div
-              onClick={() => setPhase(user ? 'quiz' : 'registration')}
+              onClick={() => setPhase('registration')}
               className="flex items-center gap-3 cursor-pointer group"
             >
               <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center text-white shadow-lg shadow-red-950/60 group-hover:scale-105 transition">
@@ -227,6 +229,8 @@ export const App: React.FC<{ user?: any, onExit?: () => void }> = ({ user, onExi
             onComplete={handleRegistrationComplete}
             supabaseConnected={supabaseConnected}
             onOpenConfig={() => setIsConfigOpen(true)}
+            initialPrincipalName={user?.name || ''}
+            initialTeamName={user ? `${user.name} GP` : ''}
           />
         )}
 

@@ -21,11 +21,37 @@ export async function saveParticipantToDatabase(record: ParticipantRecord): Prom
 }
 
 export async function fetchLeaderboard(): Promise<ParticipantRecord[]> {
-  return [];
+  const { data, error } = await supabase
+    .from('strategy_scores')
+    .select('*')
+    .order('score', { ascending: false });
+    
+  if (error || !data) return [];
+  
+  return data.map(d => ({
+    team_id: d.bits_id,
+    principal_name: d.principal_name || 'Strategist',
+    team_name: d.team_name || 'Grand Prix Racing',
+    status: 'Finished',
+    total_score: d.score,
+    strategy_score: d.score,
+    race_position: d.race_position || 1,
+    current_lap: 60,
+    updated_at: d.updated_at
+  } as ParticipantRecord));
 }
 
 export function subscribeToLiveLeaderboard(onUpdate: (records: ParticipantRecord[]) => void): () => void {
-  return () => {};
+  const channel = supabase
+    .channel('public:strategy_scores')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'strategy_scores' }, async () => {
+      const records = await fetchLeaderboard();
+      onUpdate(records);
+    })
+    .subscribe();
+  return () => {
+    supabase.removeChannel(channel);
+  };
 }
 
 export function getSupabaseConfig(): any {

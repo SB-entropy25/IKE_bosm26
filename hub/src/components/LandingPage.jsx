@@ -104,7 +104,7 @@ export function LandingPage({ existingUser, onJoinRace, onAdminLogin, onRestoreS
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center shadow-lg">
             <Flag className="w-5 h-5 text-white fill-current" />
           </div>
-          <span className="font-teko text-xl font-bold text-white tracking-wider">IKE MOTORSPORT</span>
+          <span className="font-teko text-xl font-bold text-white tracking-wider">IKE</span>
           <span className="text-red-500 font-teko text-xl font-bold">× BOSM</span>
         </div>
         <div className="flex items-center gap-3">
@@ -125,7 +125,7 @@ export function LandingPage({ existingUser, onJoinRace, onAdminLogin, onRestoreS
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-6 py-16">
         {/* IKE badge */}
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold uppercase tracking-widest mb-6 float-up">
-          <Flag className="w-3.5 h-3.5" /> BITS Pilani BOSM 2026 · Presented by IKE Motorsport
+          <Flag className="w-3.5 h-3.5" /> BITS Pilani BOSM 2026 · Presented by IKE
         </div>
 
         {/* Main title */}
@@ -221,7 +221,7 @@ export function LandingPage({ existingUser, onJoinRace, onAdminLogin, onRestoreS
             <span>Strategy Round — F1 Simulation</span>
           </div>
         </div>
-        <span className="text-gray-600">IKE BOSM 2026 · All Rights Reserved</span>
+        <span className="text-gray-600">IKE BOSM 2026</span>
       </div>
     </div>
   )

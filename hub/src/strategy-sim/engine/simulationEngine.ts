@@ -160,7 +160,7 @@ export function processDecision(
     if (currentState.driver_confidence < 50) fuelBurn *= 1.15; // Erratic driving uses more fuel
     nextState.fuel_load = Math.max(0, +(nextState.fuel_load - fuelBurn).toFixed(1));
 
-    let ersDrain = Math.floor(Math.random() * 15) + 20;
+    let ersDrain = Math.floor(Math.random() * 10) + 10;
     // INTERLINK: Low reliability causes MGU-K clipping, draining ERS faster
     if (currentState.reliability < 45) ersDrain = Math.floor(ersDrain * gameConfig.mechanics.reliabilityErsMultiplier);
     nextState.ers_percent = Math.max(0, nextState.ers_percent - ersDrain);
@@ -217,7 +217,7 @@ export function processDecision(
     nextState.tire_health = Math.max(0, nextState.tire_health - Math.round(wear));
     nextState.gap_behind = Math.max(0.6, +(nextState.gap_behind + (Math.random() * 1.2 + 0.6)).toFixed(1));
     
-    let ersDrain = Math.floor(Math.random() * 10) + 12;
+    let ersDrain = Math.floor(Math.random() * 5) + 8;
     if (currentState.reliability < 45) ersDrain = Math.floor(ersDrain * gameConfig.mechanics.reliabilityErsMultiplier);
     nextState.ers_percent = Math.max(0, nextState.ers_percent - ersDrain);
     

@@ -28,9 +28,9 @@ export function UserHub({ user, onSpeedRound, onStrategyRound, onLogout }) {
       {/* Navbar */}
       <nav className="flex justify-between items-center mb-10 pb-4 border-b border-white/10">
         <div>
-          <h1 className="font-teko text-3xl font-bold text-white tracking-wide">IKE ULTIMATE HUB</h1>
+          <h1 className="font-teko text-3xl font-bold text-white tracking-wide">IKE F1 QUIZ</h1>
           <p className="text-xs text-gray-400 font-inter">
-            Driver: <strong className="text-white">{user.name}</strong> • ID: <strong className="text-white">{user.bitsId}</strong>
+            Driver: <strong className="text-white">{user.name}</strong> • ID: <strong className="text-white">{user.bitsId || user.bits_id}</strong>
           </p>
         </div>
         <button onClick={onLogout} className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition bg-white/5 px-4 py-2 rounded-lg border border-white/10">
@@ -60,7 +60,7 @@ export function UserHub({ user, onSpeedRound, onStrategyRound, onLogout }) {
 
             <h3 className="font-teko text-4xl font-bold text-white mb-2 relative z-10">SPEED ROUND</h3>
             <p className="text-sm text-gray-400 font-inter mb-8 relative z-10 min-h-[60px]">
-              The IKE Motorsport Quiz. Test your knowledge on F1 history, technical regulations, and teams in a rapid-fire live event.
+              The IKE Quiz. Test your knowledge on F1 history, technical regulations, and teams in a rapid-fire live event.
             </p>
 
             <button
