@@ -27,6 +27,7 @@ export function SpeedRound({ user, soundEnabled, onBack }) {
   const TAB_SWITCH_LIMIT = 3
   const gameStateRef = useRef('waiting')
   const tabSwitchCountRef = useRef(0)
+  const qSwitchCountRef = useRef(0)
 
   const channelRef = useRef(null)
   const timerRef = useRef(null)
@@ -95,6 +96,7 @@ export function SpeedRound({ user, soundEnabled, onBack }) {
       setResult(null)
       setAnswer('')
       setQLeaderboard([])
+      qSwitchCountRef.current = 0
     })
 
     channel.on('broadcast', { event: 'answer_result' }, ({ payload }) => {
@@ -170,6 +172,7 @@ export function SpeedRound({ user, soundEnabled, onBack }) {
     const handleVisibilityChange = () => {
       if (document.hidden && gameStateRef.current === 'playing') {
         tabSwitchCountRef.current += 1
+        qSwitchCountRef.current += 1
         const newCount = tabSwitchCountRef.current
         setTabSwitchCount(newCount)
         if (newCount >= TAB_SWITCH_LIMIT) setIsFlagged(true)
@@ -233,7 +236,8 @@ export function SpeedRound({ user, soundEnabled, onBack }) {
         name: user.name,
         avatarName: avatarName,
         answer: finalAnswer,
-        timeElapsed: timer
+        timeElapsed: timer,
+        qSwitchCount: qSwitchCountRef.current
       }
     })
   }
@@ -334,7 +338,12 @@ export function SpeedRound({ user, soundEnabled, onBack }) {
             </div>
             <h2 className="text-4xl md:text-5xl font-teko font-bold mb-4 text-white uppercase tracking-widest drop-shadow-lg">Waiting for Green Light...</h2>
             
-            <div className="bg-[#1a1d24] w-full mt-8 p-6 rounded-2xl border border-[#272b35] shadow-xl">
+            <div className="bg-amber-900/20 border border-amber-600/50 p-4 rounded-xl mt-4 w-full text-sm font-bold text-amber-400">
+              ⚠️ PLEASE DO NOT SWITCH TABS OR MINIMIZE THE WINDOW DURING THE QUIZ. 
+              <div className="text-amber-500 font-normal mt-1 text-xs">It will be logged and may result in point deductions or disqualification.</div>
+            </div>
+            
+            <div className="bg-[#1a1d24] w-full mt-6 p-6 rounded-2xl border border-[#272b35] shadow-xl">
               <h3 className="text-gray-300 font-bold uppercase tracking-widest text-sm mb-4">Set Racing Alias (Optional)</h3>
               <p className="text-xs text-gray-500 mb-4">If you want to see your anonymous name on the leaderboard (Be creative in making one!)</p>
               <form onSubmit={saveAvatarName} className="flex gap-2">

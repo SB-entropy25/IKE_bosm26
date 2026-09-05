@@ -18,6 +18,7 @@ export function SpeedRoundAdmin({ onBack }) {
   const [qLeaderboard, setQLeaderboard] = useState([])
   const [flaggedPlayers, setFlaggedPlayers] = useState([]) // anti-cheat
   const [pausedPlayers, setPausedPlayers] = useState(new Set()) // tracking paused state
+  const [showOnlyFlagged, setShowOnlyFlagged] = useState(false)
 
   const qIndexRef = useRef(-1)
   const questionsRef = useRef([])
@@ -324,17 +325,29 @@ export function SpeedRoundAdmin({ onBack }) {
   const timeRemaining = currentQ ? Math.max(0, currentQ.time_allotted - activeTimer) : 0
   const enhancedLeaderboard = leaderboard.map(user => {
     const flagData = flaggedPlayers.find(p => p.bitsId === user.bits_id)
+    const qStats = qLeaderboard.find(q => q.bitsId === user.bits_id)
     return {
       ...user,
       switchCount: flagData?.switchCount || 0,
       isFlagged: flagData?.flagged || false,
-      reason: flagData?.reason || ''
+      reason: flagData?.reason || '',
+      qSwitchCount: qStats?.qSwitchCount || 0,
+      qEarnedPoints: qStats?.earnedPoints || 0
     }
   }).sort((a, b) => {
     if (a.isFlagged && !b.isFlagged) return -1
     if (!a.isFlagged && b.isFlagged) return 1
     return b.switchCount - a.switchCount || b.score - a.score
-  })
+  }).filter(u => showOnlyFlagged ? u.switchCount > 0 : true)
+
+  const handleCustomDeduct = (bitsId, currentScore) => {
+    const amtStr = window.prompt("Enter points to deduct for this user:", "10")
+    if (amtStr === null) return
+    const amt = parseInt(amtStr)
+    if (!isNaN(amt) && amt > 0) {
+      deductScore(bitsId, currentScore, amt)
+    }
+  }
 
   return (
     <div className="fixed inset-0 bg-[#0f1115] flex flex-col z-50 font-inter text-gray-100 h-screen overflow-hidden">
@@ -568,9 +581,17 @@ export function SpeedRoundAdmin({ onBack }) {
                   <h2 className="font-bold text-white text-lg">Grid Roster</h2>
                   <p className="text-sm text-gray-400">Manage all registered drivers.</p>
                 </div>
-                <div className="bg-[#232730] px-4 py-2 rounded-xl border border-[#2b303b]">
-                  <span className="text-xs text-gray-500 font-bold uppercase">Total Drivers:</span>
-                  <span className="ml-2 font-bold text-white">{leaderboard.length}</span>
+                <div className="flex items-center gap-4">
+                  <button 
+                    onClick={() => setShowOnlyFlagged(!showOnlyFlagged)}
+                    className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition ${showOnlyFlagged ? 'bg-red-600 text-white' : 'bg-[#232730] text-gray-400 hover:text-white border border-[#2b303b]'}`}
+                  >
+                    {showOnlyFlagged ? 'Showing Flagged' : 'Show Flagged'}
+                  </button>
+                  <div className="bg-[#232730] px-4 py-2 rounded-xl border border-[#2b303b]">
+                    <span className="text-xs text-gray-500 font-bold uppercase">Total Drivers:</span>
+                    <span className="ml-2 font-bold text-white">{leaderboard.length}</span>
+                  </div>
                 </div>
              </div>
              <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
@@ -608,6 +629,17 @@ export function SpeedRoundAdmin({ onBack }) {
                           <span className="text-gray-500 font-bold uppercase text-[10px]">Switches:</span> <span className={`font-bold ${u.switchCount >= 3 ? 'text-red-500' : u.switchCount > 0 ? 'text-amber-500' : 'text-gray-400'}`}>{u.switchCount}</span>
                         </div>
                       </div>
+
+                      {currentQuestionIndex >= 0 && (
+                        <div className="text-sm mt-1 flex justify-between items-center bg-black/20 p-2 rounded-lg border border-white/5">
+                          <div>
+                            <span className="text-gray-500 font-bold uppercase text-[10px]">Q{currentQuestionIndex+1} Pts:</span> <span className="text-purple-400 font-bold">+{u.qEarnedPoints}</span>
+                          </div>
+                          <div>
+                            <span className="text-gray-500 font-bold uppercase text-[10px]">Q{currentQuestionIndex+1} Flags:</span> <span className={`font-bold ${u.qSwitchCount > 0 ? 'text-amber-500' : 'text-gray-400'}`}>{u.qSwitchCount}</span>
+                          </div>
+                        </div>
+                      )}
                       
                       {/* Action Buttons */}
                       <div className="mt-3 pt-3 border-t border-[#2b303b] grid grid-cols-3 gap-2">
@@ -618,10 +650,10 @@ export function SpeedRoundAdmin({ onBack }) {
                           {isPaused ? 'Resume' : 'Pause'}
                         </button>
                         <button 
-                          onClick={() => deductScore(u.bits_id, u.score, 10)}
+                          onClick={() => handleCustomDeduct(u.bits_id, u.score)}
                           className="text-xs py-1.5 bg-[#2b303b] text-gray-400 hover:bg-orange-600 hover:text-white rounded font-bold uppercase tracking-wider transition"
                         >
-                          -10 Pts
+                          Deduct
                         </button>
                         <button 
                           onClick={() => resetTabCount(u.bits_id)}
