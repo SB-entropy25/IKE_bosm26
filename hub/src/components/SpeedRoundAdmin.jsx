@@ -16,6 +16,8 @@ export function SpeedRoundAdmin({ onBack }) {
 
   const [activeTimer, setActiveTimer] = useState(0)
   const [qLeaderboard, setQLeaderboard] = useState([])
+  const [flaggedPlayers, setFlaggedPlayers] = useState([]) // anti-cheat
+  const [pausedPlayers, setPausedPlayers] = useState(new Set()) // tracking paused state
 
   const qIndexRef = useRef(-1)
   const questionsRef = useRef([])
@@ -107,6 +109,17 @@ export function SpeedRoundAdmin({ onBack }) {
         type: 'broadcast',
         event: 'answer_result',
         payload: resultPayload
+      })
+    })
+
+    // Anti-cheat: receive flags from players
+    channel.on('broadcast', { event: 'cheat_flag' }, ({ payload }) => {
+      setFlaggedPlayers(prev => {
+        const exists = prev.find(p => p.bitsId === payload.bitsId)
+        if (exists) {
+          return prev.map(p => p.bitsId === payload.bitsId ? { ...p, switchCount: payload.switchCount } : p)
+        }
+        return [...prev, payload]
       })
     })
 
@@ -212,6 +225,51 @@ export function SpeedRoundAdmin({ onBack }) {
     }
   }
 
+  const togglePausePlayer = (bitsId) => {
+    const isCurrentlyPaused = pausedPlayers.has(bitsId)
+    setPausedPlayers(prev => {
+      const next = new Set(prev)
+      if (isCurrentlyPaused) next.delete(bitsId)
+      else next.add(bitsId)
+      return next
+    })
+
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'admin_action',
+        payload: {
+          targetId: bitsId,
+          action: isCurrentlyPaused ? 'resume' : 'pause'
+        }
+      })
+    }
+  }
+
+  const resetTabCount = (bitsId) => {
+    setFlaggedPlayers(prev => prev.filter(p => p.bitsId !== bitsId))
+    if (pausedPlayers.has(bitsId)) {
+      togglePausePlayer(bitsId) // auto-resume if paused
+    }
+    
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'admin_action',
+        payload: {
+          targetId: bitsId,
+          action: 'reset_tabs'
+        }
+      })
+    }
+  }
+
+  const deductScore = async (bitsId, currentScore, amount = 10) => {
+    const newScore = Math.max(0, currentScore - amount)
+    await supabase.from('speed_scores').update({ score: newScore }).eq('bits_id', bitsId)
+    fetchLB()
+  }
+
   const saveQuestion = async (e) => {
     e.preventDefault()
     if (!editingQuestion) return
@@ -264,6 +322,19 @@ export function SpeedRoundAdmin({ onBack }) {
 
   const currentQ = questions[currentQuestionIndex]
   const timeRemaining = currentQ ? Math.max(0, currentQ.time_allotted - activeTimer) : 0
+  const enhancedLeaderboard = leaderboard.map(user => {
+    const flagData = flaggedPlayers.find(p => p.bitsId === user.bits_id)
+    return {
+      ...user,
+      switchCount: flagData?.switchCount || 0,
+      isFlagged: flagData?.flagged || false,
+      reason: flagData?.reason || ''
+    }
+  }).sort((a, b) => {
+    if (a.isFlagged && !b.isFlagged) return -1
+    if (!a.isFlagged && b.isFlagged) return 1
+    return b.switchCount - a.switchCount || b.score - a.score
+  })
 
   return (
     <div className="fixed inset-0 bg-[#0f1115] flex flex-col z-50 font-inter text-gray-100 h-screen overflow-hidden">
@@ -503,17 +574,24 @@ export function SpeedRoundAdmin({ onBack }) {
                 </div>
              </div>
              <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {leaderboard.map((u) => (
-                    <div key={u.id} className="bg-[#232730] border border-[#2b303b] rounded-xl p-4 flex flex-col">
+                  {enhancedLeaderboard.map((u) => {
+                    const isPaused = pausedPlayers.has(u.bits_id)
+                    return (
+                    <div key={u.id} className={`bg-[#232730] border ${u.isFlagged ? 'border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]' : isPaused ? 'border-amber-500' : 'border-[#2b303b]'} rounded-xl p-4 flex flex-col`}>
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex flex-col">
-                          <span className="font-bold text-white">{u.name}</span>
+                          <span className="font-bold text-white flex items-center gap-2">
+                            {u.name}
+                            {u.isFlagged && <span className="text-[10px] bg-red-600 px-1.5 py-0.5 rounded text-white uppercase font-bold tracking-wider">Flagged</span>}
+                            {isPaused && <span className="text-[10px] bg-amber-600 px-1.5 py-0.5 rounded text-white uppercase font-bold tracking-wider">Paused</span>}
+                          </span>
                           <span className="text-xs text-gray-500 font-mono">{u.bits_id}</span>
                         </div>
                         <button 
                           onClick={() => deleteDriver(u.bits_id)}
-                          className="p-2 bg-red-900/20 hover:bg-red-600 text-red-500 hover:text-white rounded-lg transition"
+                          className="p-1.5 bg-red-900/20 hover:bg-red-600 text-red-500 hover:text-white rounded-lg transition"
                           title="Remove Driver"
                         >
                           <UserX className="w-4 h-4" />
@@ -522,12 +600,40 @@ export function SpeedRoundAdmin({ onBack }) {
                       <div className="text-sm">
                         <span className="text-gray-500 font-bold uppercase text-[10px]">Alias:</span> <span className="text-cyan-400 font-bold">{u.avatar_name || 'Not set'}</span>
                       </div>
-                      <div className="text-sm mt-1">
-                        <span className="text-gray-500 font-bold uppercase text-[10px]">Score:</span> <span className="text-green-400 font-bold">{u.score}</span>
+                      <div className="text-sm mt-1 flex justify-between items-center">
+                        <div>
+                          <span className="text-gray-500 font-bold uppercase text-[10px]">Score:</span> <span className="text-green-400 font-bold">{u.score}</span>
+                        </div>
+                        <div>
+                          <span className="text-gray-500 font-bold uppercase text-[10px]">Switches:</span> <span className={`font-bold ${u.switchCount >= 3 ? 'text-red-500' : u.switchCount > 0 ? 'text-amber-500' : 'text-gray-400'}`}>{u.switchCount}</span>
+                        </div>
+                      </div>
+                      
+                      {/* Action Buttons */}
+                      <div className="mt-3 pt-3 border-t border-[#2b303b] grid grid-cols-3 gap-2">
+                        <button 
+                          onClick={() => togglePausePlayer(u.bits_id)}
+                          className={`text-xs py-1.5 rounded font-bold uppercase tracking-wider transition ${isPaused ? 'bg-amber-600/20 text-amber-500 hover:bg-amber-600 hover:text-white' : 'bg-[#2b303b] text-gray-400 hover:bg-amber-600 hover:text-white'}`}
+                        >
+                          {isPaused ? 'Resume' : 'Pause'}
+                        </button>
+                        <button 
+                          onClick={() => deductScore(u.bits_id, u.score, 10)}
+                          className="text-xs py-1.5 bg-[#2b303b] text-gray-400 hover:bg-orange-600 hover:text-white rounded font-bold uppercase tracking-wider transition"
+                        >
+                          -10 Pts
+                        </button>
+                        <button 
+                          onClick={() => resetTabCount(u.bits_id)}
+                          disabled={u.switchCount === 0}
+                          className="text-xs py-1.5 bg-[#2b303b] text-gray-400 hover:bg-blue-600 hover:text-white disabled:opacity-50 disabled:hover:bg-[#2b303b] disabled:hover:text-gray-400 rounded font-bold uppercase tracking-wider transition"
+                        >
+                          Reset Tab
+                        </button>
                       </div>
                     </div>
-                  ))}
-                  {leaderboard.length === 0 && <p className="text-gray-500 col-span-full text-center py-10 font-bold">No drivers registered yet.</p>}
+                  )})}
+                  {enhancedLeaderboard.length === 0 && <p className="text-gray-500 col-span-full text-center py-10 font-bold">No drivers registered yet.</p>}
                 </div>
              </div>
            </div>

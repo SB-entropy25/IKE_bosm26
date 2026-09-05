@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { loadSession, saveSession, clearSession } from './store.js'
 import { supabase } from './supabase.js'
 import { LandingPage } from './components/LandingPage.jsx'
@@ -15,16 +15,34 @@ export default function App() {
   const [soundEnabled, setSoundEnabled] = useState(true)
   const [authSession, setAuthSession] = useState(null)
   const [isProcessingAuth, setIsProcessingAuth] = useState(false)
+  // Prevent double-firing of onAuthStateChange
+  const authHandledRef = useRef(false)
 
   useEffect(() => {
+    // 1. First restore from localStorage — fast, no flicker
+    const localSession = loadSession()
+    if (localSession && localSession.bitsId) {
+      setUser(localSession)
+      // Don't call auth at all — we're already logged in from cache
+      return
+    }
+
+    // 2. Only process OAuth callback if there's a login_intent (user just clicked Sign In)
+    const intent = localStorage.getItem('login_intent')
+    if (!intent) return
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      handleAuthSession(session)
+      if (!authHandledRef.current) {
+        authHandledRef.current = true
+        handleAuthSession(session)
+      }
     })
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      handleAuthSession(session)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!authHandledRef.current) {
+        authHandledRef.current = true
+        handleAuthSession(session)
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -69,25 +87,14 @@ export default function App() {
         handleUserLogin(playerCheck)
       } else {
         setAuthSession(session)
-        setView('userLogin') 
+        setView('userLogin')
       }
       localStorage.removeItem('login_intent')
-    } else if (intent === 'null' || !intent) {
-        const { data: playerCheck } = await supabase.from('hub_users').select('*').eq('email', email).single()
-        if (playerCheck) {
-          handleUserLogin(playerCheck)
-        }
     }
     setIsProcessingAuth(false)
   }
 
-  useEffect(() => {
-    const session = loadSession()
-    if (session && session.bitsId) {
-      setUser(session)
-    }
-  }, [])
-
+  // Listen for admin removing this user
   useEffect(() => {
     if (!user || !user.id) return
 
@@ -103,27 +110,21 @@ export default function App() {
       })
       .subscribe()
 
-    return () => {
-      supabase.removeChannel(channel)
-    }
+    return () => { supabase.removeChannel(channel) }
   }, [user])
 
   const handleUserLogin = (userData) => {
-    // Normalize: DB returns bits_id (snake_case), old code expects bitsId (camelCase)
     const normalized = { ...userData, bitsId: userData.bitsId || userData.bits_id }
     setUser(normalized)
     saveSession(normalized)
     setView('userHub')
   }
 
-  const handleAdminLogin = () => {
-    setView('adminPanel')
-  }
-
   const handleLogout = async () => {
     clearSession()
     await supabase.auth.signOut()
     setUser(null)
+    authHandledRef.current = false
     setView('landing')
   }
 
@@ -150,7 +151,6 @@ export default function App() {
 
       {view === 'adminLogin' && (
         <AdminLogin
-          onLogin={handleAdminLogin}
           onBack={() => setView('landing')}
         />
       )}
@@ -171,16 +171,16 @@ export default function App() {
       {view === 'speedRound' && user && (
         <SpeedRound user={user} onBack={() => setView('userHub')} />
       )}
-      
+
       {view === 'strategyRound' && user && (
         <StrategyRound user={user} onBack={() => setView('userHub')} />
       )}
 
       {isProcessingAuth && (
-         <div className="fixed inset-0 z-[1000] bg-black/80 flex flex-col items-center justify-center backdrop-blur-sm">
-           <div className="w-12 h-12 border-4 border-gray-600 border-t-red-500 rounded-full animate-spin mb-4"></div>
-           <p className="text-white font-teko text-xl tracking-widest uppercase">Authenticating...</p>
-         </div>
+        <div className="fixed inset-0 z-[1000] bg-black/80 flex flex-col items-center justify-center backdrop-blur-sm">
+          <div className="w-12 h-12 border-4 border-gray-600 border-t-red-500 rounded-full animate-spin mb-4"></div>
+          <p className="text-white font-teko text-xl tracking-widest uppercase">Authenticating...</p>
+        </div>
       )}
     </div>
   )

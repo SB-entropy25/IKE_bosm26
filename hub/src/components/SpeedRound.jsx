@@ -20,6 +20,14 @@ export function SpeedRound({ user, soundEnabled, onBack }) {
   const [leaderboard, setLeaderboard] = useState([])
   const [qLeaderboard, setQLeaderboard] = useState([])
 
+  // Anti-cheat: tab switch tracking
+  const [tabSwitchCount, setTabSwitchCount] = useState(0)
+  const [isFlagged, setIsFlagged] = useState(false)
+  const [isPaused, setIsPaused] = useState(false)
+  const TAB_SWITCH_LIMIT = 3
+  const gameStateRef = useRef('waiting')
+  const tabSwitchCountRef = useRef(0)
+
   const channelRef = useRef(null)
   const timerRef = useRef(null)
 
@@ -114,6 +122,18 @@ export function SpeedRound({ user, soundEnabled, onBack }) {
       setGameState('ended')
     })
 
+    channel.on('broadcast', { event: 'admin_action' }, ({ payload }) => {
+      if (payload.targetId === user.bitsId) {
+        if (payload.action === 'pause') setIsPaused(true)
+        else if (payload.action === 'resume') setIsPaused(false)
+        else if (payload.action === 'reset_tabs') {
+          tabSwitchCountRef.current = 0
+          setTabSwitchCount(0)
+          setIsFlagged(false)
+        }
+      }
+    })
+
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
         await channel.track({ online_at: new Date().toISOString() })
@@ -139,6 +159,42 @@ export function SpeedRound({ user, soundEnabled, onBack }) {
       if (timerRef.current) clearInterval(timerRef.current)
     }
   }, [gameState, currentQuestion, hasAnswered])
+
+  // Keep gameStateRef in sync so the visibility listener can read it without stale closure
+  useEffect(() => {
+    gameStateRef.current = gameState
+  }, [gameState])
+
+  // Anti-cheat: detect tab/window switching during active game
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && gameStateRef.current === 'playing') {
+        tabSwitchCountRef.current += 1
+        const newCount = tabSwitchCountRef.current
+        setTabSwitchCount(newCount)
+        if (newCount >= TAB_SWITCH_LIMIT) setIsFlagged(true)
+
+        // Broadcast EVERY switch so admin sees live count
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: 'broadcast',
+            event: 'cheat_flag',
+            payload: {
+              bitsId: user.bitsId,
+              name: user.name,
+              avatarName: avatarName,
+              switchCount: newCount,
+              flagged: newCount >= TAB_SWITCH_LIMIT,
+              reason: `Tab switched ${newCount} time${newCount !== 1 ? 's' : ''} during Speed Round`
+            }
+          })
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [user.bitsId, user.name, avatarName])
 
   const saveAvatarName = async (e) => {
     e.preventDefault()
@@ -203,6 +259,19 @@ export function SpeedRound({ user, soundEnabled, onBack }) {
   return (
     <div className="fixed inset-0 bg-[#0f1115] flex flex-col z-50 text-gray-100 font-inter h-screen overflow-hidden">
       
+      {isPaused && (
+        <div className="absolute inset-0 bg-black/90 z-[999] flex flex-col items-center justify-center p-6 text-center backdrop-blur-md">
+          <div className="w-20 h-20 bg-red-600/20 rounded-full flex items-center justify-center mb-6 animate-pulse">
+            <div className="w-10 h-10 bg-red-600 rounded-sm"></div>
+          </div>
+          <h2 className="text-4xl font-teko font-bold italic tracking-wider text-red-500 mb-4">RACE SUSPENDED</h2>
+          <p className="text-xl text-gray-300 max-w-md">
+            Your session has been paused by Race Control due to suspicious activity (tab switching). 
+          </p>
+          <p className="text-gray-500 mt-4">Please wait for admin instructions.</p>
+        </div>
+      )}
+
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-[#161920] border-b border-[#232730] shadow-sm z-10 shrink-0">
         <button onClick={onBack} className="flex items-center gap-2 text-xs text-gray-400 hover:text-white transition font-inter font-semibold uppercase tracking-wider">
@@ -219,7 +288,16 @@ export function SpeedRound({ user, soundEnabled, onBack }) {
           {participantCount} GRID
         </div>
       </div>
-      
+
+      {/* Anti-cheat warning banner */}
+      {gameState === 'playing' && tabSwitchCount > 0 && (
+        <div className={`px-4 py-2 text-center text-xs font-bold uppercase tracking-widest shrink-0 ${isFlagged ? 'bg-red-900/80 text-red-200 animate-pulse' : 'bg-amber-900/50 text-amber-300'}`}>
+          {isFlagged
+            ? `⛔ You have been flagged for suspicious activity (${tabSwitchCount} tab switches). Admin has been notified.`
+            : `⚠️ Tab switch detected: ${tabSwitchCount}/${TAB_SWITCH_LIMIT} — Flagged after ${TAB_SWITCH_LIMIT}`}
+        </div>
+      )}
+
       {/* Instructions Modal */}
       {showInstructions && (
         <div className="fixed inset-0 bg-black/90 z-[100] flex items-center justify-center p-4 backdrop-blur-sm">
