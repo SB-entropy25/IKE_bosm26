@@ -185,7 +185,11 @@ export function SpeedRoundAdmin({ onBack }) {
       setCurrentQuestionIndex(nextIdx)
       setActiveTimer(0)
       setQLeaderboard([])
-      setFlaggedPlayers(prev => prev.map(p => ({ ...p, qSwitchCount: 0 })))
+      setFlaggedPlayers(prev => prev.map(p => ({ 
+        ...p, 
+        history: [...(p.history || []), p.qSwitchCount || 0].slice(-3),
+        qSwitchCount: 0 
+      })))
       setProjectorView('question')
       supabase.from('hub_settings').update({ current_question_index: nextIdx }).eq('id', 1)
       const q = questions[nextIdx]
@@ -278,6 +282,26 @@ export function SpeedRoundAdmin({ onBack }) {
     const newScore = Math.max(0, currentScore - amount)
     await supabase.from('speed_scores').update({ score: newScore }).eq('bits_id', bitsId)
     fetchLB()
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'admin_action',
+        payload: { targetId: bitsId, action: 'deduct', amount }
+      })
+    }
+  }
+
+  const handleSendMessage = (bitsId) => {
+    const msg = window.prompt(`Enter message to send to driver ${bitsId}:`)
+    if (msg) {
+      if (channelRef.current) {
+        channelRef.current.send({
+          type: 'broadcast',
+          event: 'admin_action',
+          payload: { targetId: bitsId, action: 'message', message: msg }
+        })
+      }
+    }
   }
 
   const saveQuestion = async (e) => {
@@ -340,6 +364,7 @@ export function SpeedRoundAdmin({ onBack }) {
       switchCount: flagData?.switchCount || 0,
       isFlagged: flagData?.flagged || false,
       reason: flagData?.reason || '',
+      history: flagData?.history || [],
       qSwitchCount: flagData?.qSwitchCount || qStats?.qSwitchCount || 0,
       qEarnedPoints: qStats?.earnedPoints || 0
     }
@@ -650,8 +675,15 @@ export function SpeedRoundAdmin({ onBack }) {
                         </div>
                       )}
                       
+                      {u.history && u.history.length > 0 && (
+                        <div className="text-[10px] text-gray-500 font-bold uppercase mt-2 flex justify-between items-center bg-black/20 px-2 py-1 rounded">
+                          <span>Past Q Flags:</span>
+                          <span className="flex gap-1">{u.history.map((h, i) => <span key={i} className={`px-1.5 py-0.5 rounded ${h > 0 ? 'bg-amber-900/50 text-amber-500' : 'bg-[#1a1d24]'}`}>{h}</span>)}</span>
+                        </div>
+                      )}
+                      
                       {/* Action Buttons */}
-                      <div className="mt-3 pt-3 border-t border-[#2b303b] grid grid-cols-3 gap-2">
+                      <div className="mt-3 pt-3 border-t border-[#2b303b] grid grid-cols-2 gap-2">
                         <button 
                           onClick={() => togglePausePlayer(u.bits_id)}
                           className={`text-xs py-1.5 rounded font-bold uppercase tracking-wider transition ${isPaused ? 'bg-amber-600/20 text-amber-500 hover:bg-amber-600 hover:text-white' : 'bg-[#2b303b] text-gray-400 hover:bg-amber-600 hover:text-white'}`}
@@ -663,6 +695,12 @@ export function SpeedRoundAdmin({ onBack }) {
                           className="text-xs py-1.5 bg-[#2b303b] text-gray-400 hover:bg-orange-600 hover:text-white rounded font-bold uppercase tracking-wider transition"
                         >
                           Deduct
+                        </button>
+                        <button 
+                          onClick={() => handleSendMessage(u.bits_id)}
+                          className="text-xs py-1.5 bg-[#2b303b] text-gray-400 hover:bg-cyan-600 hover:text-white rounded font-bold uppercase tracking-wider transition"
+                        >
+                          Message
                         </button>
                         <button 
                           onClick={() => resetTabCount(u.bits_id)}
