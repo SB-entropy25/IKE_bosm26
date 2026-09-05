@@ -118,7 +118,7 @@ export function SpeedRoundAdmin({ onBack }) {
       setFlaggedPlayers(prev => {
         const exists = prev.find(p => p.bitsId === payload.bitsId)
         if (exists) {
-          return prev.map(p => p.bitsId === payload.bitsId ? { ...p, switchCount: payload.switchCount } : p)
+          return prev.map(p => p.bitsId === payload.bitsId ? { ...p, ...payload } : p)
         }
         return [...prev, payload]
       })
@@ -163,6 +163,7 @@ export function SpeedRoundAdmin({ onBack }) {
       setCurrentQuestionIndex(0)
       setActiveTimer(0)
       setQLeaderboard([])
+      setFlaggedPlayers(prev => prev.map(p => ({ ...p, qSwitchCount: 0 })))
       setProjectorView('question')
       supabase.from('hub_settings').update({ speed_game_state: 'playing', current_question_index: 0 }).eq('id', 1)
       channelRef.current.send({ type: 'broadcast', event: 'game_started' })
@@ -184,6 +185,7 @@ export function SpeedRoundAdmin({ onBack }) {
       setCurrentQuestionIndex(nextIdx)
       setActiveTimer(0)
       setQLeaderboard([])
+      setFlaggedPlayers(prev => prev.map(p => ({ ...p, qSwitchCount: 0 })))
       setProjectorView('question')
       supabase.from('hub_settings').update({ current_question_index: nextIdx }).eq('id', 1)
       const q = questions[nextIdx]
@@ -331,7 +333,7 @@ export function SpeedRoundAdmin({ onBack }) {
       switchCount: flagData?.switchCount || 0,
       isFlagged: flagData?.flagged || false,
       reason: flagData?.reason || '',
-      qSwitchCount: qStats?.qSwitchCount || 0,
+      qSwitchCount: flagData?.qSwitchCount || qStats?.qSwitchCount || 0,
       qEarnedPoints: qStats?.earnedPoints || 0
     }
   }).sort((a, b) => {

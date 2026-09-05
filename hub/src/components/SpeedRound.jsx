@@ -187,6 +187,7 @@ export function SpeedRound({ user, soundEnabled, onBack }) {
               name: user.name,
               avatarName: avatarName,
               switchCount: newCount,
+              qSwitchCount: qSwitchCountRef.current,
               flagged: newCount >= TAB_SWITCH_LIMIT,
               reason: `Tab switched ${newCount} time${newCount !== 1 ? 's' : ''} during Speed Round`
             }
