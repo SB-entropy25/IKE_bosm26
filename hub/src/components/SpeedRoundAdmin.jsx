@@ -222,6 +222,13 @@ export function SpeedRoundAdmin({ onBack }) {
 
   const deleteDriver = async (bitsId) => {
     if (confirm(`Remove driver ${bitsId}? This will delete their registration and scores.`)) {
+      if (channelRef.current) {
+        channelRef.current.send({
+          type: 'broadcast',
+          event: 'admin_action',
+          payload: { targetId: bitsId, action: 'kick' }
+        })
+      }
       await supabase.from('speed_scores').delete().eq('bits_id', bitsId)
       await supabase.from('hub_users').delete().eq('bits_id', bitsId)
       fetchLB()

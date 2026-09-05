@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, Info, FastForward, Clock, Shield, Trophy } from 'lucide-react'
 import { supabase } from '../supabase.js'
 
-export function SpeedRound({ user, soundEnabled, onBack }) {
+export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
   const [gameState, setGameState] = useState('waiting')
   const [currentQuestion, setCurrentQuestion] = useState(null)
   const [result, setResult] = useState(null)
@@ -132,6 +132,9 @@ export function SpeedRound({ user, soundEnabled, onBack }) {
           tabSwitchCountRef.current = 0
           setTabSwitchCount(0)
           setIsFlagged(false)
+        } else if (payload.action === 'kick') {
+          alert("You have been kicked by the admin.")
+          if (onLogout) onLogout()
         }
       }
     })

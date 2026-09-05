@@ -178,7 +178,7 @@ export default function App() {
       )}
 
       {view === 'speedRound' && user && (
-        <SpeedRound user={user} onBack={() => setView('userHub')} />
+        <SpeedRound user={user} onBack={() => setView('userHub')} onLogout={handleLogout} />
       )}
 
       {view === 'strategyRound' && user && (
