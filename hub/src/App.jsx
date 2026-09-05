@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { loadSession, saveSession, clearSession } from './store.js'
+import { loadSession, saveSession, clearSession, loadAdminSession, saveAdminSession, clearAdminSession } from './store.js'
 import { supabase } from './supabase.js'
 import { LandingPage } from './components/LandingPage.jsx'
 import { UserLogin } from './components/UserLogin.jsx'
@@ -20,9 +20,16 @@ export default function App() {
 
   useEffect(() => {
     // 1. First restore from localStorage — fast, no flicker
+    const adminSession = loadAdminSession()
+    if (adminSession && adminSession.email) {
+      setView('adminPanel')
+      return
+    }
+
     const localSession = loadSession()
     if (localSession && localSession.bitsId) {
       setUser(localSession)
+      setView('userHub') // actually go to userHub instead of staying on landing
       // Don't call auth at all — we're already logged in from cache
       return
     }
@@ -67,6 +74,7 @@ export default function App() {
     if (intent === 'admin') {
       const { data: adminCheck } = await supabase.from('admin_users').select('*').eq('email', email).single()
       if (adminCheck) {
+        saveAdminSession(adminCheck)
         setView('adminPanel')
       } else {
         alert('Unauthorized admin email. Access denied.')
@@ -122,6 +130,7 @@ export default function App() {
 
   const handleLogout = async () => {
     clearSession()
+    clearAdminSession()
     await supabase.auth.signOut()
     setUser(null)
     authHandledRef.current = false
