@@ -136,7 +136,7 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
           alert("You have been kicked by the admin.")
           if (onLogout) onLogout()
         } else if (payload.action === 'deduct') {
-          alert(`WARNING: The admin has deducted ${payload.amount} points from your score due to infractions.`)
+          alert(`WARNING: The admin has deducted ${payload.amount} points from your score due to multiple tab changes.`)
         } else if (payload.action === 'message') {
           alert(`MESSAGE FROM RACE CONTROL:\n\n${payload.message}`)
         }

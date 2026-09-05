@@ -19,6 +19,7 @@ export function SpeedRoundAdmin({ onBack }) {
   const [flaggedPlayers, setFlaggedPlayers] = useState([]) // anti-cheat
   const [pausedPlayers, setPausedPlayers] = useState(new Set()) // tracking paused state
   const [showOnlyFlagged, setShowOnlyFlagged] = useState(false)
+  const [notifyOnDeduct, setNotifyOnDeduct] = useState(true)
 
   const qIndexRef = useRef(-1)
   const questionsRef = useRef([])
@@ -282,7 +283,7 @@ export function SpeedRoundAdmin({ onBack }) {
     const newScore = Math.max(0, currentScore - amount)
     await supabase.from('speed_scores').update({ score: newScore }).eq('bits_id', bitsId)
     fetchLB()
-    if (channelRef.current) {
+    if (notifyOnDeduct && channelRef.current) {
       channelRef.current.send({
         type: 'broadcast',
         event: 'admin_action',
@@ -616,6 +617,15 @@ export function SpeedRoundAdmin({ onBack }) {
                   <p className="text-sm text-gray-400">Manage all registered drivers.</p>
                 </div>
                 <div className="flex items-center gap-4">
+                  <label className="flex items-center gap-2 cursor-pointer bg-[#232730] px-3 py-2 rounded-xl border border-[#2b303b]">
+                    <input 
+                      type="checkbox" 
+                      checked={notifyOnDeduct}
+                      onChange={(e) => setNotifyOnDeduct(e.target.checked)}
+                      className="w-4 h-4 rounded bg-gray-900 border-gray-600 focus:ring-cyan-600 focus:ring-2 text-cyan-600"
+                    />
+                    <span className="text-xs text-gray-400 font-bold uppercase tracking-wide">Alert on Deduct</span>
+                  </label>
                   <button 
                     onClick={() => setShowOnlyFlagged(!showOnlyFlagged)}
                     className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-widest transition ${showOnlyFlagged ? 'bg-red-600 text-white' : 'bg-[#232730] text-gray-400 hover:text-white border border-[#2b303b]'}`}
