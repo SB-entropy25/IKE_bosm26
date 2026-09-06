@@ -2,6 +2,24 @@ import React, { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, Info, FastForward, Clock, Shield, Trophy } from 'lucide-react'
 import { supabase } from '../supabase.js'
 
+const F1_TRIVIA = [
+  "F1 cars can go from 0 to 300 km/h and back to 0 in under 10 seconds.",
+  "A Formula 1 steering wheel costs more than most family cars — around $50,000.",
+  "Drivers lose up to 4kg in body weight during a single hot race.",
+  "F1 brakes can reach temperatures of 1,000°C under heavy braking.",
+  "The fastest pit stop ever recorded was just 1.82 seconds (Red Bull, 2019).",
+  "An F1 car generates enough downforce to drive upside down in a tunnel — in theory!",
+  "Lewis Hamilton holds the record for most pole positions in F1 history.",
+  "Monaco's street circuit is the shortest on the calendar, yet one of the hardest to master.",
+  "F1 engines rev up to 15,000 RPM, screaming louder than a rock concert.",
+  "The Halo device has saved multiple drivers' lives since its introduction in 2018.",
+  "Michael Schumacher and Lewis Hamilton share the record of 7 World Championships each.",
+  "F1 cars use tires that are bald — literally no tread — for maximum grip in dry conditions.",
+  "A single F1 tire can lose over 0.5 seconds per lap after just 10 laps of wear.",
+  "The Italian Grand Prix at Monza is nicknamed the 'Temple of Speed'.",
+  "F1 drivers experience up to 6G of force during hard cornering and braking — more than astronauts at launch!"
+]
+
 export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
   const [gameState, setGameState] = useState('waiting')
   const [currentQuestion, setCurrentQuestion] = useState(null)
@@ -19,6 +37,7 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
   const [showPlayerLeaderboard, setShowPlayerLeaderboard] = useState(false)
   const [leaderboard, setLeaderboard] = useState([])
   const [qLeaderboard, setQLeaderboard] = useState([])
+  const [triviaIndex, setTriviaIndex] = useState(0)
 
   // Anti-cheat: tab switch tracking
   const [tabSwitchCount, setTabSwitchCount] = useState(0)
@@ -96,6 +115,7 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
       setResult(null)
       setAnswer('')
       setQLeaderboard([])
+      setTriviaIndex(Math.floor(Math.random() * F1_TRIVIA.length))
       qSwitchCountRef.current = 0
     })
 
@@ -462,6 +482,19 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
                         </div>
                       </div>
                     )}
+
+                    {/* F1 Trivia Flashcard */}
+                    <div className="mt-8 w-full max-w-sm bg-gradient-to-br from-[#1e232e] to-[#14171d] border-2 border-[#2b303b] p-5 rounded-2xl shadow-2xl relative overflow-hidden group hover:border-red-600/50 transition-colors">
+                       <div className="absolute top-[-10px] right-[-10px] opacity-[0.03] transform rotate-12 transition-transform group-hover:scale-110 group-hover:opacity-[0.06] duration-500">
+                          <Trophy className="w-32 h-32" />
+                       </div>
+                       <h4 className="text-red-500 font-black uppercase tracking-widest text-xs mb-3 flex items-center gap-2 font-teko text-lg">
+                         <span className="w-2 h-2 bg-red-600 rounded-full animate-pulse shadow-[0_0_8px_rgba(220,38,38,0.8)]"></span> KNOWLEDGE BITE
+                       </h4>
+                       <p className="text-gray-300 text-sm font-semibold italic relative z-10 leading-relaxed text-left border-l-4 border-red-600/30 pl-3">
+                         "{F1_TRIVIA[triviaIndex]}"
+                       </p>
+                    </div>
                   </div>
                 )}
               </div>
