@@ -45,9 +45,24 @@ export function SpeedRoundAdmin({ onBack }) {
     fetchQuestions()
     fetchLB()
 
-    supabase.from('hub_settings').select('show_speed_leaderboard').single().then(({ data }) => {
-      if (data && data.show_speed_leaderboard !== undefined) {
-        setShowPlayerLeaderboard(data.show_speed_leaderboard)
+    supabase.from('hub_settings').select('*').single().then(({ data }) => {
+      if (data) {
+        if (data.show_speed_leaderboard !== undefined) setShowPlayerLeaderboard(data.show_speed_leaderboard)
+        if (data.speed_game_state) setGameState(data.speed_game_state)
+        if (data.current_question_index !== undefined && data.current_question_index !== -1) {
+          setCurrentQuestionIndex(data.current_question_index)
+          setProjectorView('question')
+          // Try to recover activeTimer from localStorage if we are in playing state
+          if (data.speed_game_state === 'playing') {
+            const savedTime = localStorage.getItem('admin_q_start_time')
+            if (savedTime) {
+              const elapsed = Math.floor((Date.now() - parseInt(savedTime)) / 1000)
+              if (elapsed >= 0) setActiveTimer(elapsed)
+            }
+          }
+        } else if (data.speed_game_state === 'ended') {
+          setProjectorView('overall')
+        }
       }
     })
 
@@ -163,6 +178,7 @@ export function SpeedRoundAdmin({ onBack }) {
       setGameState('playing')
       setCurrentQuestionIndex(0)
       setActiveTimer(0)
+      localStorage.setItem('admin_q_start_time', Date.now().toString())
       setQLeaderboard([])
       setFlaggedPlayers(prev => prev.map(p => ({ ...p, qSwitchCount: 0 })))
       setProjectorView('question')
@@ -185,6 +201,7 @@ export function SpeedRoundAdmin({ onBack }) {
     if (nextIdx < questions.length) {
       setCurrentQuestionIndex(nextIdx)
       setActiveTimer(0)
+      localStorage.setItem('admin_q_start_time', Date.now().toString())
       setQLeaderboard([])
       setFlaggedPlayers(prev => prev.map(p => ({ 
         ...p, 
@@ -435,6 +452,20 @@ export function SpeedRoundAdmin({ onBack }) {
                     className="w-full bg-[#272b35] hover:bg-[#323844] text-white font-bold py-3 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Push Next Question
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if(confirm("Terminate the current active session?")) {
+                        setGameState('ended')
+                        setProjectorView('overall')
+                        supabase.from('hub_settings').update({ speed_game_state: 'ended' }).eq('id', 1)
+                        channelRef.current.send({ type: 'broadcast', event: 'game_ended' })
+                      }
+                    }}
+                    disabled={gameState !== 'playing'}
+                    className="w-full bg-red-900/20 hover:bg-red-900/50 text-red-500 font-bold py-2 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                  >
+                    Terminate Session
                   </button>
                 </div>
                 
