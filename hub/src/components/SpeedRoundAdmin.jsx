@@ -20,11 +20,14 @@ export function SpeedRoundAdmin({ onBack }) {
   const [pausedPlayers, setPausedPlayers] = useState(new Set()) // tracking paused state
   const [showOnlyFlagged, setShowOnlyFlagged] = useState(false)
   const [notifyOnDeduct, setNotifyOnDeduct] = useState(true)
+  const [showStartModal, setShowStartModal] = useState(false)
+  const [startConfig, setStartConfig] = useState({ wipeScores: true, startIndex: 0 })
 
   const qIndexRef = useRef(-1)
   const questionsRef = useRef([])
   const channelRef = useRef(null)
   const timerRef = useRef(null)
+  const qLeaderboardRef = useRef([])
 
   useEffect(() => {
     qIndexRef.current = currentQuestionIndex
@@ -46,23 +49,32 @@ export function SpeedRoundAdmin({ onBack }) {
     fetchLB()
 
     supabase.from('hub_settings').select('*').single().then(({ data }) => {
-      if (data) {
-        if (data.show_speed_leaderboard !== undefined) setShowPlayerLeaderboard(data.show_speed_leaderboard)
-        if (data.speed_game_state) setGameState(data.speed_game_state)
-        if (data.current_question_index !== undefined && data.current_question_index !== -1) {
-          setCurrentQuestionIndex(data.current_question_index)
-          setProjectorView('question')
-          // Try to recover activeTimer from localStorage if we are in playing state
-          if (data.speed_game_state === 'playing') {
-            const savedTime = localStorage.getItem('admin_q_start_time')
-            if (savedTime) {
-              const elapsed = Math.floor((Date.now() - parseInt(savedTime)) / 1000)
-              if (elapsed >= 0) setActiveTimer(elapsed)
-            }
-          }
-        } else if (data.speed_game_state === 'ended') {
-          setProjectorView('overall')
+      let finalState = 'waiting'
+      let finalIndex = -1
+
+      if (data && data.speed_game_state) {
+        finalState = data.speed_game_state
+        setGameState(data.speed_game_state)
+      }
+
+      if (data && data.current_question_index !== undefined && data.current_question_index !== -1) {
+        finalIndex = data.current_question_index
+        setCurrentQuestionIndex(data.current_question_index)
+        setProjectorView('question')
+      }
+
+      if (data && data.show_speed_leaderboard !== undefined) {
+        setShowPlayerLeaderboard(data.show_speed_leaderboard)
+      }
+
+      if (finalState === 'playing') {
+        const savedTime = localStorage.getItem('admin_q_start_time')
+        if (savedTime) {
+          const elapsed = Math.floor((Date.now() - parseInt(savedTime)) / 1000)
+          if (elapsed >= 0) setActiveTimer(elapsed)
         }
+      } else if (finalState === 'ended') {
+        setProjectorView('overall')
       }
     })
 
@@ -86,6 +98,10 @@ export function SpeedRoundAdmin({ onBack }) {
       if (qIndex < 0 || qIndex >= qList.length) return
       
       const { bitsId, name, avatarName, answer, timeElapsed } = payload
+      
+      // Prevent duplicate submissions for the same question
+      if (qLeaderboardRef.current.some(p => p.bitsId === bitsId)) return
+      
       const currentQ = qList[qIndex]
       
       let isCorrect = false
@@ -108,6 +124,11 @@ export function SpeedRoundAdmin({ onBack }) {
         }
       }
 
+      const resultPayload = { bitsId, name, avatarName, isCorrect, earnedPoints, timeElapsed, isSkipped }
+      
+      // Immediately add to ref to block further dupes while DB updates
+      qLeaderboardRef.current.push(resultPayload)
+
       if (earnedPoints > 0) {
         const { data: userRow } = await supabase.from('speed_scores').select('score').eq('bits_id', bitsId).single()
         if (userRow) {
@@ -115,8 +136,6 @@ export function SpeedRoundAdmin({ onBack }) {
         }
       }
 
-      const resultPayload = { bitsId, name, avatarName, isCorrect, earnedPoints, timeElapsed, isSkipped }
-      
       setQLeaderboard(prev => {
         const next = [...prev, resultPayload]
         return next.sort((a,b) => b.earnedPoints - a.earnedPoints || a.timeElapsed - b.timeElapsed)
@@ -172,44 +191,64 @@ export function SpeedRoundAdmin({ onBack }) {
   }, [gameState, currentQuestionIndex])
 
   const handleStartGame = () => {
-    if(!confirm("This will reset all speed round scores to 0. Continue?")) return;
-    
-    supabase.from('speed_scores').update({ score: 0 }).neq('bits_id', '').then(() => {
-      setGameState('playing')
-      setCurrentQuestionIndex(0)
-      setActiveTimer(0)
-      localStorage.setItem('admin_q_start_time', Date.now().toString())
-      setQLeaderboard([])
-      setFlaggedPlayers(prev => prev.map(p => ({ ...p, qSwitchCount: 0 })))
-      setProjectorView('question')
-      supabase.from('hub_settings').update({ speed_game_state: 'playing', current_question_index: 0 }).eq('id', 1)
-      channelRef.current.send({ type: 'broadcast', event: 'game_started' })
-      
-      if (questions.length > 0) {
-        const q = questions[0]
-        channelRef.current.send({
-          type: 'broadcast',
-          event: 'new_question',
-          payload: { id: q.id, type: q.type, text: q.text, options: q.options, max_points: q.max_points, time_allotted: q.time_allotted }
-        })
-      }
-    })
+    setStartConfig({ wipeScores: true, startIndex: 0 })
+    setShowStartModal(true)
   }
 
-  const handleNextQuestion = () => {
+  const confirmStartGame = async () => {
+    if (startConfig.wipeScores) {
+      if (!window.confirm("WARNING: You selected to WIPE ALL SCORES. This will permanently reset all player points to 0. Are you absolutely sure?")) {
+        return; // Abort if they cancel
+      }
+    }
+    
+    setShowStartModal(false)
+    
+    if (startConfig.wipeScores) {
+      await supabase.from('speed_scores').update({ score: 0 }).neq('bits_id', '')
+    }
+
+    const sIdx = startConfig.startIndex
+    setGameState('playing')
+    setCurrentQuestionIndex(sIdx)
+    setActiveTimer(0)
+    localStorage.setItem('admin_game_state', 'playing')
+    localStorage.setItem('admin_q_index', sIdx.toString())
+    localStorage.setItem('admin_q_start_time', Date.now().toString())
+    setQLeaderboard([])
+    qLeaderboardRef.current = []
+    setFlaggedPlayers(prev => prev.map(p => ({ ...p, qSwitchCount: 0 })))
+    setProjectorView('question')
+    
+    await supabase.from('hub_settings').update({ speed_game_state: 'playing', current_question_index: sIdx }).eq('id', 1)
+    channelRef.current.send({ type: 'broadcast', event: 'game_started' })
+    
+    if (questions.length > sIdx) {
+      const q = questions[sIdx]
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'new_question',
+        payload: { id: q.id, type: q.type, text: q.text, options: q.options, max_points: q.max_points, time_allotted: q.time_allotted }
+      })
+    }
+  }
+
+  const handleNextQuestion = async () => {
     const nextIdx = currentQuestionIndex + 1
     if (nextIdx < questions.length) {
       setCurrentQuestionIndex(nextIdx)
       setActiveTimer(0)
+      localStorage.setItem('admin_q_index', nextIdx.toString())
       localStorage.setItem('admin_q_start_time', Date.now().toString())
       setQLeaderboard([])
+      qLeaderboardRef.current = []
       setFlaggedPlayers(prev => prev.map(p => ({ 
         ...p, 
         history: [...(p.history || []), p.qSwitchCount || 0].slice(-3),
         qSwitchCount: 0 
       })))
       setProjectorView('question')
-      supabase.from('hub_settings').update({ current_question_index: nextIdx }).eq('id', 1)
+      await supabase.from('hub_settings').update({ current_question_index: nextIdx }).eq('id', 1)
       const q = questions[nextIdx]
       channelRef.current.send({
         type: 'broadcast',
@@ -219,7 +258,9 @@ export function SpeedRoundAdmin({ onBack }) {
     } else {
       setGameState('ended')
       setProjectorView('overall')
-      supabase.from('hub_settings').update({ speed_game_state: 'ended' }).eq('id', 1)
+      localStorage.setItem('admin_game_state', 'ended')
+      localStorage.setItem('admin_q_index', '-1')
+      await supabase.from('hub_settings').update({ speed_game_state: 'ended', current_question_index: -1 }).eq('id', 1)
       channelRef.current.send({ type: 'broadcast', event: 'game_ended' })
     }
   }
@@ -454,13 +495,14 @@ export function SpeedRoundAdmin({ onBack }) {
                     Push Next Question
                   </button>
                   <button 
-                    onClick={() => {
-                      if(confirm("Terminate the current active session?")) {
-                        setGameState('ended')
-                        setProjectorView('overall')
-                        supabase.from('hub_settings').update({ speed_game_state: 'ended' }).eq('id', 1)
-                        channelRef.current.send({ type: 'broadcast', event: 'game_ended' })
-                      }
+                    onClick={async () => {
+                      if(!window.confirm("Terminate the entire speed round session?")) return;
+                      setGameState('ended')
+                      setProjectorView('overall')
+                      localStorage.setItem('admin_game_state', 'ended')
+                      localStorage.setItem('admin_q_index', '-1')
+                      await supabase.from('hub_settings').update({ speed_game_state: 'ended', current_question_index: -1 }).eq('id', 1)
+                      channelRef.current.send({ type: 'broadcast', event: 'game_ended' })
                     }}
                     disabled={gameState !== 'playing'}
                     className="w-full bg-red-900/20 hover:bg-red-900/50 text-red-500 font-bold py-2 rounded-xl transition disabled:opacity-50 disabled:cursor-not-allowed text-sm"
@@ -469,16 +511,44 @@ export function SpeedRoundAdmin({ onBack }) {
                   </button>
                 </div>
                 
-                {gameState === 'playing' && currentQ && (
+                {['playing', 'paused'].includes(gameState) && currentQ && (
                   <>
                     <h2 className="text-sm font-bold text-gray-400 uppercase tracking-widest mt-6 mb-3">Live Timer Control</h2>
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 mb-3">
                       <button onClick={() => adjustTime(-5)} className="p-3 bg-[#232730] hover:bg-red-900/50 text-red-400 rounded-xl transition"><Minus className="w-5 h-5"/></button>
                       <div className={`flex-1 text-center border py-2 rounded-xl font-mono font-bold ${timeRemaining === 0 ? 'bg-red-900/50 border-red-500 text-red-500 animate-pulse text-lg' : 'bg-[#0f1115] border-[#272b35] text-cyan-400 text-xl'}`}>
                         {timeRemaining === 0 ? "TIME'S UP!" : `${timeRemaining}s`}
                       </div>
                       <button onClick={() => adjustTime(5)} className="p-3 bg-[#232730] hover:bg-green-900/50 text-green-400 rounded-xl transition"><Plus className="w-5 h-5"/></button>
                     </div>
+                    
+                    {gameState === 'playing' ? (
+                      <button 
+                        onClick={async () => {
+                          setGameState('paused')
+                          localStorage.setItem('admin_game_state', 'paused')
+                          await supabase.from('hub_settings').update({ speed_game_state: 'paused' }).eq('id', 1)
+                          channelRef.current.send({ type: 'broadcast', event: 'game_paused' })
+                        }}
+                        className="w-full bg-yellow-600/20 hover:bg-yellow-600/50 text-yellow-500 font-bold py-2 rounded-xl border border-yellow-500/30 transition text-sm mb-2"
+                      >
+                        Pause Session
+                      </button>
+                    ) : (
+                      <button 
+                        onClick={async () => {
+                          setGameState('playing')
+                          localStorage.setItem('admin_game_state', 'playing')
+                          await supabase.from('hub_settings').update({ speed_game_state: 'playing' }).eq('id', 1)
+                          channelRef.current.send({ type: 'broadcast', event: 'game_resumed' })
+                          localStorage.setItem('admin_q_start_time', (Date.now() - activeTimer * 1000).toString())
+                        }}
+                        className="w-full bg-green-600/20 hover:bg-green-600/50 text-green-500 font-bold py-2 rounded-xl border border-green-500/30 transition text-sm mb-2 animate-pulse"
+                      >
+                        Resume Session
+                      </button>
+                    )}
+
                     <div className="mt-3 text-center text-[10px] font-bold text-gray-400 uppercase tracking-widest bg-[#0f1115] border border-[#272b35] py-1.5 rounded-lg">
                       Current Points Worth: <span className="text-yellow-400 text-sm ml-1">{Math.max(10, currentQ.max_points - (Math.floor(activeTimer / 5) * 5))}</span>
                     </div>
@@ -603,7 +673,7 @@ export function SpeedRoundAdmin({ onBack }) {
                        ))}
                      </div>
                   </div>
-                ) : gameState === 'playing' && currentQuestionIndex >= 0 ? (
+                ) : gameState === 'playing' && currentQuestionIndex >= 0 && currentQ ? (
                    <div className="text-center w-full max-w-4xl">
                       <h3 className="text-3xl md:text-4xl font-bold mb-12 text-white leading-tight">{currentQ.text}</h3>
                       {currentQ.type === 'mcq' && (
@@ -909,6 +979,61 @@ export function SpeedRoundAdmin({ onBack }) {
           </div>
         )}
       </div>
+
+      {showStartModal && (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-[#1a1d24] border-2 border-[#2b303b] rounded-3xl p-8 w-full max-w-md shadow-2xl">
+            <h2 className="text-3xl font-teko font-black text-white uppercase tracking-widest mb-2 flex items-center gap-3">
+              <Play className="w-8 h-8 text-green-500" /> Start Race Config
+            </h2>
+            <p className="text-gray-400 text-sm mb-8">Customize how this race session begins for all connected users.</p>
+            
+            <div className="space-y-6">
+              <div>
+                <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Starting Question</label>
+                <select 
+                  value={startConfig.startIndex}
+                  onChange={e => setStartConfig(p => ({ ...p, startIndex: parseInt(e.target.value) }))}
+                  className="w-full bg-[#0f1115] border border-[#2b303b] rounded-xl p-4 text-white font-bold focus:border-red-500 focus:outline-none appearance-none"
+                >
+                  {questions.map((q, idx) => (
+                    <option key={q.id} value={idx}>Q{idx + 1}: {q.text.substring(0, 40)}...</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex items-center gap-4 bg-[#0f1115] p-4 rounded-xl border border-red-900/30">
+                <input 
+                  type="checkbox" 
+                  id="wipeScores"
+                  checked={startConfig.wipeScores}
+                  onChange={e => setStartConfig(p => ({ ...p, wipeScores: e.target.checked }))}
+                  className="w-5 h-5 accent-red-500 rounded cursor-pointer"
+                />
+                <label htmlFor="wipeScores" className="text-sm font-bold text-red-400 cursor-pointer">
+                  Wipe all current scores to 0
+                </label>
+              </div>
+            </div>
+
+            <div className="flex gap-4 mt-10">
+              <button 
+                onClick={() => setShowStartModal(false)}
+                className="flex-1 py-4 bg-[#232730] hover:bg-[#2b303b] text-gray-300 font-bold rounded-xl transition uppercase tracking-widest text-sm"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={confirmStartGame}
+                className="flex-1 py-4 bg-green-600 hover:bg-green-500 text-white font-black rounded-xl transition uppercase tracking-widest text-sm shadow-[0_0_20px_rgba(34,197,94,0.3)]"
+              >
+                Start Grid
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

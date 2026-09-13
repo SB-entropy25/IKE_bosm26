@@ -9,6 +9,23 @@ import { AdminPanel } from './components/AdminPanel.jsx'
 import { SpeedRound } from './components/SpeedRound.jsx'
 import { StrategyRound } from './components/StrategyRound.jsx'
 
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-8 bg-red-900 text-white min-h-screen flex flex-col items-center justify-center">
+          <h1 className="text-3xl font-bold mb-4">React App Crashed</h1>
+          <pre className="whitespace-pre-wrap bg-black/50 p-4 rounded text-sm mb-4">{this.state.error?.toString()}</pre>
+          <button onClick={() => window.location.reload()} className="px-6 py-2 bg-white text-red-900 font-bold rounded">Reload App</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
 export default function App() {
   const [view, setView] = useState('landing')
   const [user, setUser] = useState(null)
@@ -138,7 +155,8 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#060709] text-gray-200 relative">
+    <ErrorBoundary>
+      <div className="min-h-screen bg-[#060709] text-gray-200 relative">
       {view === 'landing' && (
         <LandingPage
           existingUser={loadSession()}
@@ -191,6 +209,7 @@ export default function App() {
           <p className="text-white font-teko text-xl tracking-widest uppercase">Authenticating...</p>
         </div>
       )}
-    </div>
+      </div>
+    </ErrorBoundary>
   )
 }

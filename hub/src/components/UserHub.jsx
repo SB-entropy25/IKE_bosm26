@@ -1,10 +1,22 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../supabase.js'
-import { LogOut, Zap, Lock, Unlock, PlayCircle } from 'lucide-react'
+import { LogOut, Zap, Lock, Unlock, PlayCircle, Info } from 'lucide-react'
+
+const TRIVIA_FACTS = [
+  "The fastest ever pit stop in F1 was 1.80 seconds, performed by McLaren on Lando Norris's car at the 2023 Qatar Grand Prix.",
+  "An F1 car can generate so much downforce that, theoretically, it could drive upside down in a tunnel at speeds over 120 mph.",
+  "F1 drivers can lose up to 3kg (6.6 lbs) of weight during a single race due to intense heat and G-forces.",
+  "F1 steering wheels have up to 25 buttons and switches, controlling everything from differential settings to drink delivery.",
+  "The halo system is made from grade 5 titanium and can withstand the weight of two African elephants (12,000 kg).",
+  "A modern F1 car has around 80,000 components, and they must be assembled with 100% accuracy to ensure safety.",
+  "F1 brakes can heat up to 1,000°C (1,832°F) during heavy braking zones, glowing bright orange.",
+  "A Formula 1 engine revs up to 15,000 RPM, which is about two to three times faster than a standard road car."
+]
 
 export function UserHub({ user, onSpeedRound, onStrategyRound, onLogout }) {
   const [settings, setSettings] = useState({ speed_round_enabled: false, strategy_round_enabled: false })
   const [loading, setLoading] = useState(true)
+  const [activeTriviaIndex, setActiveTriviaIndex] = useState(0)
 
   useEffect(() => {
     // Initial fetch
@@ -101,7 +113,7 @@ export function UserHub({ user, onSpeedRound, onStrategyRound, onLogout }) {
               disabled={!settings.strategy_round_enabled}
               className={`w-full py-4 rounded-xl font-teko text-2xl font-bold tracking-wider uppercase transition-all flex items-center justify-center gap-2 relative z-10 ${
                 settings.strategy_round_enabled
-                  ? 'bg-gradient-to-r from-cyan-600 to-teal-600 hover:from-cyan-500 hover:to-teal-500 text-white shadow-lg shadow-cyan-900/40'
+                  ? 'bg-gradient-to-r from-cyan-600 to-cyan-700 hover:from-cyan-500 hover:to-cyan-600 text-white shadow-lg shadow-cyan-900/40'
                   : 'bg-white/10 text-gray-500 cursor-not-allowed border border-white/5'
               }`}
             >
@@ -109,6 +121,48 @@ export function UserHub({ user, onSpeedRound, onStrategyRound, onLogout }) {
             </button>
           </div>
         </div>
+
+        {/* Explore Section: Creative Trivia Swap */}
+        <div className="mt-20 w-full max-w-md mx-auto fade-in">
+          <div className="flex items-center gap-3 mb-6 justify-center">
+            <span className="w-16 h-[1px] bg-gradient-to-r from-transparent to-gray-700"></span>
+            <span className="text-gray-500 font-teko text-xl tracking-[0.2em] uppercase">Paddock Intel</span>
+            <span className="w-16 h-[1px] bg-gradient-to-l from-transparent to-gray-700"></span>
+          </div>
+          
+          <div className="relative h-44 w-full cursor-pointer group perspective-1000" onClick={() => setActiveTriviaIndex(p => (p + 1) % TRIVIA_FACTS.length)}>
+             {TRIVIA_FACTS.map((fact, idx) => {
+               let offset = (idx - activeTriviaIndex + TRIVIA_FACTS.length) % TRIVIA_FACTS.length;
+               if (offset > 2) return null;
+
+               return (
+                 <div 
+                   key={idx}
+                   className="absolute inset-0 w-full h-full p-6 rounded-2xl border flex flex-col items-center justify-center text-center transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)]"
+                   style={{
+                     backgroundColor: offset === 0 ? '#1a1d24' : offset === 1 ? '#15171d' : '#111318',
+                     borderColor: offset === 0 ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.02)',
+                     transform: `translateY(${offset * 16}px) scale(${1 - offset * 0.06})`,
+                     zIndex: 10 - offset,
+                     opacity: 1 - offset * 0.35,
+                     boxShadow: offset === 0 ? '0 20px 40px -20px rgba(0,0,0,0.8)' : 'none',
+                   }}
+                 >
+                    <Info className="w-5 h-5 text-red-500 mb-3 opacity-60" />
+                    <p className="font-inter text-gray-300 leading-relaxed text-[13px] md:text-sm px-2">
+                      {fact}
+                    </p>
+                    {offset === 0 && (
+                      <span className="absolute bottom-3 text-[10px] text-gray-600 uppercase tracking-widest font-bold group-hover:text-red-400 transition-colors">
+                        Click to swap card
+                      </span>
+                    )}
+                 </div>
+               )
+             })}
+          </div>
+        </div>
+
       </div>
     </div>
   )

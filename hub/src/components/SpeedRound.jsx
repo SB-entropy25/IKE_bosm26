@@ -38,6 +38,8 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
   const [leaderboard, setLeaderboard] = useState([])
   const [qLeaderboard, setQLeaderboard] = useState([])
   const [triviaIndex, setTriviaIndex] = useState(0)
+  
+  const [hasJoinedLobby, setHasJoinedLobby] = useState(false)
 
   // Anti-cheat: tab switch tracking
   const [tabSwitchCount, setTabSwitchCount] = useState(0)
@@ -58,12 +60,15 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
       if (st) {
         setGameState(st.speed_game_state)
         setShowPlayerLeaderboard(st.show_speed_leaderboard || false)
-        if (st.speed_game_state === 'playing' && st.current_question_index >= 0) {
+        if (['playing', 'paused'].includes(st.speed_game_state) && st.current_question_index >= 0) {
           const { data: q } = await supabase.from('questions').select('*').order('sort_order', { ascending: true })
           if (q && q[st.current_question_index]) {
-            setCurrentQuestion(q[st.current_question_index])
+            const currentQ = q[st.current_question_index]
+            setCurrentQuestion(currentQ)
             setTimer(0) 
-            setHasAnswered(false)
+            
+            const alreadyAnswered = sessionStorage.getItem(`answered_${currentQ.id}`) === 'true'
+            setHasAnswered(alreadyAnswered)
             setResult(null)
           }
         }
@@ -106,9 +111,13 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
 
     channel.on('broadcast', { event: 'game_started' }, () => {
       setGameState('playing')
+      Object.keys(sessionStorage).forEach(k => {
+        if (k.startsWith('answered_')) sessionStorage.removeItem(k)
+      })
     })
     
     channel.on('broadcast', { event: 'new_question' }, ({ payload }) => {
+      sessionStorage.removeItem(`answered_${payload.id}`)
       setCurrentQuestion(payload)
       setTimer(0)
       setHasAnswered(false)
@@ -142,6 +151,14 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
     
     channel.on('broadcast', { event: 'game_ended' }, () => {
       setGameState('ended')
+    })
+    
+    channel.on('broadcast', { event: 'game_paused' }, () => {
+      setGameState('paused')
+    })
+
+    channel.on('broadcast', { event: 'game_resumed' }, () => {
+      setGameState('playing')
     })
 
     channel.on('broadcast', { event: 'admin_action' }, ({ payload }) => {
@@ -256,6 +273,9 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
   }
 
   const submitAnswerToAdmin = (finalAnswer) => {
+    if (currentQuestion) {
+      sessionStorage.setItem(`answered_${currentQuestion.id}`, 'true')
+    }
     channelRef.current.send({
       type: 'broadcast',
       event: 'submit_answer',
@@ -291,14 +311,14 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
   return (
     <div className="fixed inset-0 bg-[#0f1115] flex flex-col z-50 text-gray-100 font-inter h-screen overflow-hidden">
       
-      {isPaused && (
+      { (isPaused || gameState === 'paused') && (
         <div className="absolute inset-0 bg-black/90 z-[999] flex flex-col items-center justify-center p-6 text-center backdrop-blur-md">
           <div className="w-20 h-20 bg-red-600/20 rounded-full flex items-center justify-center mb-6 animate-pulse">
             <div className="w-10 h-10 bg-red-600 rounded-sm"></div>
           </div>
           <h2 className="text-4xl font-teko font-bold italic tracking-wider text-red-500 mb-4">RACE SUSPENDED</h2>
           <p className="text-xl text-gray-300 max-w-md">
-            Your session has been paused by Race Control due to suspicious activity (tab switching). 
+            {gameState === 'paused' ? 'The session has been paused globally by Race Control.' : 'Your session has been paused by Race Control due to suspicious activity (tab switching).'} 
           </p>
           <p className="text-gray-500 mt-4">Please wait for admin instructions.</p>
         </div>
@@ -357,24 +377,14 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto flex flex-col items-center p-4 relative custom-scrollbar">
         
-        {gameState === 'waiting' && (
+        {!hasJoinedLobby ? (
           <div className="flex flex-col items-center justify-center h-full w-full max-w-md mx-auto text-center">
-            <div className="flex space-x-4 mb-8">
-              <div className="w-12 h-12 rounded-full bg-red-600 opacity-20"></div>
-              <div className="w-12 h-12 rounded-full bg-yellow-500 opacity-20"></div>
-              <div className="w-12 h-12 rounded-full bg-green-500 animate-pulse shadow-[0_0_30px_rgba(34,197,94,0.3)]"></div>
-            </div>
-            <h2 className="text-4xl md:text-5xl font-teko font-bold mb-4 text-white uppercase tracking-widest drop-shadow-lg">Waiting for Green Light...</h2>
-            
-            <div className="bg-amber-900/20 border border-amber-600/50 p-4 rounded-xl mt-4 w-full text-sm font-bold text-amber-400">
-              ⚠️ PLEASE DO NOT SWITCH TABS OR MINIMIZE THE WINDOW DURING THE QUIZ. 
-              <div className="text-amber-500 font-normal mt-1 text-xs">It will be logged and may result in point deductions or disqualification.</div>
-            </div>
+            <h2 className="text-4xl md:text-5xl font-teko font-bold mb-4 text-white uppercase tracking-widest drop-shadow-lg">Garage / Paddock</h2>
             
             <div className="bg-[#1a1d24] w-full mt-6 p-6 rounded-2xl border border-[#272b35] shadow-xl">
               <h3 className="text-gray-300 font-bold uppercase tracking-widest text-sm mb-4">Set Racing Alias (Optional)</h3>
-              <p className="text-xs text-gray-500 mb-4">If you want to see your anonymous name on the leaderboard (Be creative in making one!)</p>
-              <form onSubmit={saveAvatarName} className="flex gap-2">
+              <p className="text-xs text-gray-500 mb-4">Set your anonymous name before joining the track!</p>
+              <form onSubmit={saveAvatarName} className="flex gap-2 mb-6">
                 <input 
                   type="text" 
                   maxLength={15}
@@ -391,11 +401,40 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
                   {isAvatarSet ? 'Saved' : 'Save'}
                 </button>
               </form>
+
+              <button 
+                onClick={() => setHasJoinedLobby(true)}
+                className={`w-full py-3 font-bold rounded-xl uppercase tracking-widest transition text-white shadow-lg ${gameState === 'playing' ? 'bg-amber-600 hover:bg-amber-500 shadow-[0_0_15px_rgba(217,119,6,0.2)]' : 'bg-red-600 hover:bg-red-500 shadow-[0_0_15px_rgba(220,38,38,0.2)]'}`}
+              >
+                {gameState === 'playing' ? 'Join Ongoing Race' : 'Enter Grid'}
+              </button>
+            </div>
+          </div>
+        ) : gameState === 'waiting' && (
+          <div className="flex flex-col items-center justify-center h-full w-full max-w-md mx-auto text-center">
+            <div className="flex space-x-4 mb-8">
+              <div className="w-12 h-12 rounded-full bg-red-600 opacity-20"></div>
+              <div className="w-12 h-12 rounded-full bg-yellow-500 opacity-20"></div>
+              <div className="w-12 h-12 rounded-full bg-green-500 animate-pulse shadow-[0_0_30px_rgba(34,197,94,0.3)]"></div>
+            </div>
+            <h2 className="text-4xl md:text-5xl font-teko font-bold mb-4 text-white uppercase tracking-widest drop-shadow-lg">Waiting for Green Light...</h2>
+            
+            <div className="bg-amber-900/20 border border-amber-600/50 p-4 rounded-xl mt-4 w-full text-sm font-bold text-amber-400">
+              ⚠️ PLEASE DO NOT SWITCH TABS OR MINIMIZE THE WINDOW DURING THE QUIZ. 
+              <div className="text-amber-500 font-normal mt-1 text-xs">It will be logged and may result in point deductions or disqualification.</div>
             </div>
           </div>
         )}
 
-        {gameState === 'playing' && currentQuestion && (
+        {gameState === 'playing' && !currentQuestion && hasJoinedLobby && (
+          <div className="flex flex-col items-center justify-center h-full w-full max-w-md mx-auto text-center">
+            <div className="w-12 h-12 border-4 border-[#272b35] border-t-cyan-500 rounded-full animate-spin mb-6 shadow-[0_0_15px_rgba(6,182,212,0.5)]"></div>
+            <h2 className="text-3xl font-teko font-bold text-gray-300 uppercase tracking-widest">Waiting for Next Question...</h2>
+            <p className="text-sm text-gray-500 mt-2">The admin is preparing the next challenge on the grid.</p>
+          </div>
+        )}
+
+        {gameState === 'playing' && currentQuestion && hasJoinedLobby && (
           <div className="w-full max-w-5xl flex flex-col md:flex-row gap-6 mt-4 md:mt-10">
             
             {/* Action / Result Panel */}
