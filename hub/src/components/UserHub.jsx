@@ -40,7 +40,7 @@ export function UserHub({ user, onSpeedRound, onStrategyRound, onLogout }) {
       {/* Navbar */}
       <nav className="flex justify-between items-center mb-10 pb-4 border-b border-white/10">
         <div>
-          <h1 className="font-teko text-3xl font-bold text-white tracking-wide">IKE F1 QUIZ</h1>
+          <h1 className="font-teko text-3xl font-bold text-white tracking-wide">Inspired Karters Electric F1 QUIZ</h1>
           <p className="text-xs text-gray-400 font-inter">
             Driver: <strong className="text-white">{user.name}</strong> • ID: <strong className="text-white">{user.bitsId || user.bits_id}</strong>
           </p>

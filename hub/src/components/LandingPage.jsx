@@ -75,27 +75,86 @@ export function LandingPage({ existingUser, onJoinRace, onAdminLogin, onRestoreS
   return (
     <div className="relative min-h-screen overflow-hidden flex flex-col">
       {/* Background radial glows */}
-      <div className="fixed inset-0 z-0 pointer-events-none">
-        <div style={{ animation: 'bg-pulse 3s ease-in-out infinite' }}
-          className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full"
-          style={{ background: 'radial-gradient(ellipse, rgba(225,6,0,0.15) 0%, transparent 70%)' }}
-        />
-        <div className="absolute bottom-0 left-0 w-[500px] h-[500px]"
-          style={{ background: 'radial-gradient(ellipse, rgba(0,210,190,0.08) 0%, transparent 70%)' }}
-        />
-        {/* Checkered flag pattern top-left */}
-        <div className="absolute top-0 left-0 w-32 h-32 opacity-10"
-          style={{
-            backgroundImage: 'repeating-conic-gradient(#fff 0% 25%, transparent 0% 50%)',
-            backgroundSize: '16px 16px'
-          }}
-        />
-        <div className="absolute top-0 right-0 w-32 h-32 opacity-10"
-          style={{
-            backgroundImage: 'repeating-conic-gradient(#fff 0% 25%, transparent 0% 50%)',
-            backgroundSize: '16px 16px'
-          }}
-        />
+      {/* Background Animated Track based on poster */}
+      <div className="fixed inset-0 z-0 overflow-hidden pointer-events-none bg-[#fdfaf6]">
+        <svg width="100%" height="100%" viewBox="0 0 1000 1000" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="trackRed" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#d31010" />
+              <stop offset="50%" stopColor="#aa0505" />
+              <stop offset="100%" stopColor="#800000" />
+            </linearGradient>
+            <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+              <feDropShadow dx="0" dy="20" stdDeviation="30" floodOpacity="0.5" />
+            </filter>
+          </defs>
+
+          {/* Red Track Ribbon */}
+          <path 
+            d="M 1200 -200 C 600 200, 100 400, 600 800 C 900 1100, 200 1400, -200 1200" 
+            fill="none" 
+            stroke="url(#trackRed)" 
+            strokeWidth="350" 
+            strokeLinecap="round"
+            filter="url(#shadow)"
+          />
+
+          {/* Black Asphalt Track Inside */}
+          <path 
+            id="racePath"
+            d="M 1200 -200 C 600 200, 100 400, 600 800 C 900 1100, 200 1400, -200 1200" 
+            fill="none" 
+            stroke="#111111" 
+            strokeWidth="180" 
+            strokeLinecap="round"
+          />
+
+          {/* White dashed lines */}
+          <path 
+            d="M 1200 -200 C 600 200, 100 400, 600 800 C 900 1100, 200 1400, -200 1200" 
+            fill="none" 
+            stroke="#ffffff" 
+            strokeWidth="8" 
+            strokeDasharray="40 40"
+            strokeLinecap="round"
+            opacity="0.9"
+          >
+            <animate attributeName="stroke-dashoffset" from="160" to="0" dur="1.5s" repeatCount="indefinite" />
+          </path>
+          
+          {/* Animated F1 Car 1 */}
+          <g>
+            <animateMotion dur="6s" repeatCount="indefinite" rotate="auto" path="M 1200 -200 C 600 200, 100 400, 600 800 C 900 1100, 200 1400, -200 1200" />
+            <g transform="translate(0, -40) scale(1.5)">
+              <rect x="-20" y="-10" width="40" height="20" fill="#e10600" rx="3" />
+              <rect x="-10" y="-8" width="15" height="16" fill="#111" />
+              <path d="M-20 -12 L-25 -5 L-25 5 L-20 12 Z" fill="#cc0000" />
+              <path d="M20 -15 L25 -5 L25 5 L20 15 Z" fill="#fff" />
+              <circle cx="-12" cy="-14" r="5" fill="#222" />
+              <circle cx="-12" cy="14" r="5" fill="#222" />
+              <circle cx="15" cy="-14" r="5" fill="#222" />
+              <circle cx="15" cy="14" r="5" fill="#222" />
+            </g>
+          </g>
+          
+          {/* Animated F1 Car 2 (Chasing) */}
+          <g>
+            <animateMotion dur="6s" begin="-0.8s" repeatCount="indefinite" rotate="auto" path="M 1200 -200 C 600 200, 100 400, 600 800 C 900 1100, 200 1400, -200 1200" />
+            <g transform="translate(0, 30) scale(1.5)">
+              <rect x="-20" y="-10" width="40" height="20" fill="#ffffff" rx="3" />
+              <rect x="-10" y="-8" width="15" height="16" fill="#111" />
+              <path d="M-20 -12 L-25 -5 L-25 5 L-20 12 Z" fill="#ddd" />
+              <path d="M20 -15 L25 -5 L25 5 L20 15 Z" fill="#e10600" />
+              <circle cx="-12" cy="-14" r="5" fill="#222" />
+              <circle cx="-12" cy="14" r="5" fill="#222" />
+              <circle cx="15" cy="-14" r="5" fill="#222" />
+              <circle cx="15" cy="14" r="5" fill="#222" />
+            </g>
+          </g>
+        </svg>
+        
+        {/* Overlay gradient to blend with the dark app */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0f]/90 via-[#0a0a0f]/60 to-[#0a0a0f]" />
       </div>
 
       {/* Top nav */}
@@ -104,8 +163,7 @@ export function LandingPage({ existingUser, onJoinRace, onAdminLogin, onRestoreS
           <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center shadow-lg">
             <Flag className="w-5 h-5 text-white fill-current" />
           </div>
-          <span className="font-teko text-xl font-bold text-white tracking-wider">IKE</span>
-          <span className="text-red-500 font-teko text-xl font-bold">× BOSM</span>
+          <span className="font-teko text-xl font-bold text-white tracking-wider">Inspired Karters Electric</span>
         </div>
         <div className="flex items-center gap-3">
           {!stats.loading && (
@@ -125,7 +183,7 @@ export function LandingPage({ existingUser, onJoinRace, onAdminLogin, onRestoreS
       <div className="relative z-10 flex-1 flex flex-col items-center justify-center text-center px-6 py-16">
         {/* IKE badge */}
         <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-semibold uppercase tracking-widest mb-6 float-up">
-          <Flag className="w-3.5 h-3.5" /> BITS Pilani BOSM 2026 · Presented by IKE
+          <Flag className="w-3.5 h-3.5" /> THE F1 Quiz · BOSM 2026 · Presented by IKE
         </div>
 
         {/* Main title */}
@@ -140,7 +198,7 @@ export function LandingPage({ existingUser, onJoinRace, onAdminLogin, onRestoreS
             animation: 'landing-glow 3s ease-in-out infinite',
           }}
         >
-          IKE ULTIMATE
+          ULTIMATE
         </h1>
         <h1
           className="font-teko font-extrabold uppercase leading-none mb-6"
@@ -153,7 +211,7 @@ export function LandingPage({ existingUser, onJoinRace, onAdminLogin, onRestoreS
           F1 TRIVIA <span style={{ color: '#e10600' }}>CHAMPIONSHIP</span>
         </h1>
 
-        <p className="font-inter text-gray-400 text-base max-w-xl mx-auto mb-12 leading-relaxed">
+        <p className="font-inter text-gray-200 text-base max-w-xl mx-auto mb-12 leading-relaxed bg-[#0a0a0f]/60 p-5 rounded-2xl border border-white/10 backdrop-blur-md shadow-2xl">
           Two rounds. One champion. Register with your BITS ID, battle through the{' '}
           <span className="text-red-400 font-semibold">Speed Round quiz</span> and the{' '}
           <span className="text-cyan-400 font-semibold">Strategy race simulation</span>. May the fastest mind win.
