@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
-import { ChevronLeft, Edit3, Settings, Play, Save, Check, X, Clock, Database, Users, Monitor, UserX, Plus, Minus, List } from 'lucide-react'
+import { ChevronLeft, Edit3, Settings, Play, Save, Check, X, Clock, Database, Users, Monitor, UserX, Plus, Minus, List, Download } from 'lucide-react'
 import { supabase } from '../supabase.js'
 
 export function SpeedRoundAdmin({ onBack }) {
@@ -22,6 +22,7 @@ export function SpeedRoundAdmin({ onBack }) {
   const [notifyOnDeduct, setNotifyOnDeduct] = useState(true)
   const [showStartModal, setShowStartModal] = useState(false)
   const [startConfig, setStartConfig] = useState({ wipeScores: true, startIndex: 0 })
+  const [correctCounts, setCorrectCounts] = useState({})
 
   const qIndexRef = useRef(-1)
   const questionsRef = useRef([])
@@ -136,6 +137,13 @@ export function SpeedRoundAdmin({ onBack }) {
         }
       }
 
+      if (isCorrect) {
+        setCorrectCounts(prev => ({
+          ...prev,
+          [bitsId]: (prev[bitsId] || 0) + 1
+        }))
+      }
+
       setQLeaderboard(prev => {
         const next = [...prev, resultPayload]
         return next.sort((a,b) => b.earnedPoints - a.earnedPoints || a.timeElapsed - b.timeElapsed)
@@ -168,12 +176,26 @@ export function SpeedRoundAdmin({ onBack }) {
     }
   }, [])
 
+  const revealSentRef = useRef(false)
+
   useEffect(() => {
     if (gameState === 'playing' && currentQuestionIndex >= 0) {
       if (timerRef.current) clearInterval(timerRef.current)
       timerRef.current = setInterval(() => {
         setActiveTimer(prev => {
+          const q = questions[currentQuestionIndex]
+          if (!q) return prev
+          
           const next = prev + 1
+          if (next >= q.time_allotted && !revealSentRef.current && channelRef.current) {
+            revealSentRef.current = true
+            channelRef.current.send({
+              type: 'broadcast',
+              event: 'reveal_correct_answer',
+              payload: { correct_answer: q.correct_answer }
+            }).catch(() => {})
+          }
+          
           if (channelRef.current) {
             channelRef.current.send({
               type: 'broadcast',
@@ -188,7 +210,7 @@ export function SpeedRoundAdmin({ onBack }) {
       if (timerRef.current) clearInterval(timerRef.current)
     }
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [gameState, currentQuestionIndex])
+  }, [gameState, currentQuestionIndex, questions])
 
   const handleStartGame = () => {
     setStartConfig({ wipeScores: true, startIndex: 0 })
@@ -206,12 +228,14 @@ export function SpeedRoundAdmin({ onBack }) {
     
     if (startConfig.wipeScores) {
       await supabase.from('speed_scores').update({ score: 0 }).neq('bits_id', '')
+      setCorrectCounts({})
     }
 
     const sIdx = startConfig.startIndex
     setGameState('playing')
     setCurrentQuestionIndex(sIdx)
     setActiveTimer(0)
+    revealSentRef.current = false
     localStorage.setItem('admin_game_state', 'playing')
     localStorage.setItem('admin_q_index', sIdx.toString())
     localStorage.setItem('admin_q_start_time', Date.now().toString())
@@ -238,6 +262,7 @@ export function SpeedRoundAdmin({ onBack }) {
     if (nextIdx < questions.length) {
       setCurrentQuestionIndex(nextIdx)
       setActiveTimer(0)
+      revealSentRef.current = false
       localStorage.setItem('admin_q_index', nextIdx.toString())
       localStorage.setItem('admin_q_start_time', Date.now().toString())
       setQLeaderboard([])
@@ -442,6 +467,60 @@ export function SpeedRoundAdmin({ onBack }) {
     }
   }
 
+  const exportResultsToCSV = async () => {
+    try {
+      const { data: usersData, error: usersErr } = await supabase.from('hub_users').select('*')
+      const { data: scoresData, error: scoresErr } = await supabase.from('speed_scores').select('*')
+      
+      if (usersErr || scoresErr) {
+        alert("Failed to fetch data for export.")
+        return
+      }
+
+      const combined = scoresData.map(score => {
+        const userRec = usersData.find(u => u.bits_id === score.bits_id)
+        const speedScore = score.score || 0
+        const strategyScore = 0
+        
+        // Lookup correct answers and flags from live state
+        const correctAnswers = correctCounts[score.bits_id] || 0
+        const flagCount = flaggedPlayers.find(p => p.bitsId === score.bits_id)?.switchCount || 0
+        
+        return {
+          Name: score.name || userRec?.name || 'Unknown',
+          BITS_ID: score.bits_id,
+          Email: userRec?.email || 'N/A',
+          Correct_Count: correctAnswers,
+          Flags: flagCount,
+          Speed_Score: speedScore,
+          Strategy_Score: strategyScore,
+          Net_Score: speedScore + strategyScore
+        }
+      })
+
+      combined.sort((a, b) => b.Net_Score - a.Net_Score)
+      combined.forEach((row, index) => row.Rank = index + 1)
+
+      const headers = ['Rank', 'Name', 'BITS_ID', 'Email', 'Correct_Count', 'Flags', 'Speed_Score', 'Strategy_Score', 'Net_Score']
+      const csvRows = [headers.join(',')]
+      
+      combined.forEach(row => {
+        const values = headers.map(h => `"${String(row[h]).replace(/"/g, '""')}"`)
+        csvRows.push(values.join(','))
+      })
+
+      const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' })
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `F1_Quiz_Results_${new Date().toISOString().split('T')[0]}.csv`
+      a.click()
+    } catch (err) {
+      console.error(err)
+      alert("Error exporting CSV")
+    }
+  }
+
   return (
     <div className="fixed inset-0 bg-[#0f1115] flex flex-col z-50 font-inter text-gray-100 h-screen overflow-hidden">
       
@@ -454,6 +533,10 @@ export function SpeedRoundAdmin({ onBack }) {
             <h1 className="text-2xl font-bold text-white tracking-wide flex items-center gap-3">
               F1 QUIZ <span className="px-2 py-1 bg-red-600/10 text-red-500 rounded-md text-sm border border-red-900/30">ADMIN PORTAL</span>
             </h1>
+            
+            <button onClick={exportResultsToCSV} className="ml-4 px-3 py-1.5 bg-cyan-900/40 hover:bg-cyan-900/70 border border-cyan-500/30 text-cyan-400 rounded-lg text-sm font-bold flex items-center gap-2 transition">
+              <Download className="w-4 h-4"/> Export CSV
+            </button>
         </div>
         <div className="flex gap-2 lg:gap-4 overflow-x-auto">
           <button onClick={() => setActiveTab('control')} className={`px-4 py-2 rounded-lg font-semibold text-sm transition flex items-center gap-2 ${activeTab === 'control' ? 'bg-red-600 text-white' : 'bg-[#232730] text-gray-400 hover:text-white'}`}>
@@ -509,6 +592,22 @@ export function SpeedRoundAdmin({ onBack }) {
                   >
                     Terminate Session
                   </button>
+                  {gameState === 'ended' && (
+                    <button 
+                      onClick={async () => {
+                        if(!window.confirm("Close this race and send everyone back to the Lobby?")) return;
+                        setGameState('waiting')
+                        setProjectorView('overall')
+                        localStorage.setItem('admin_game_state', 'waiting')
+                        localStorage.setItem('admin_q_index', '-1')
+                        await supabase.from('hub_settings').update({ speed_game_state: 'waiting', current_question_index: -1 }).eq('id', 1)
+                        channelRef.current.send({ type: 'broadcast', event: 'game_closed' })
+                      }}
+                      className="w-full bg-cyan-900/40 hover:bg-cyan-900/70 text-cyan-400 font-bold py-3 rounded-xl transition shadow-[0_0_15px_rgba(34,211,238,0.2)] border border-cyan-500/30"
+                    >
+                      Close Race (Back to Lobby)
+                    </button>
+                  )}
                 </div>
                 
                 {['playing', 'paused'].includes(gameState) && currentQ && (

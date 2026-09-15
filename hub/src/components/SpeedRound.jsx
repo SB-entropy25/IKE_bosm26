@@ -27,6 +27,7 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
   const [participantCount, setParticipantCount] = useState(0)
   
   const [timer, setTimer] = useState(0)
+  const [revealedAnswer, setRevealedAnswer] = useState(null)
   const [hasAnswered, setHasAnswered] = useState(false)
   const [answer, setAnswer] = useState('')
   const [showInstructions, setShowInstructions] = useState(false)
@@ -61,7 +62,7 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
         setGameState(st.speed_game_state)
         setShowPlayerLeaderboard(st.show_speed_leaderboard || false)
         if (['playing', 'paused'].includes(st.speed_game_state) && st.current_question_index >= 0) {
-          const { data: q } = await supabase.from('questions').select('*').order('sort_order', { ascending: true })
+          const { data: q } = await supabase.from('questions').select('id, text, type, options, max_points, time_allotted, sort_order').order('sort_order', { ascending: true })
           if (q && q[st.current_question_index]) {
             const currentQ = q[st.current_question_index]
             setCurrentQuestion(currentQ)
@@ -122,6 +123,7 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
       setTimer(0)
       setHasAnswered(false)
       setResult(null)
+      setRevealedAnswer(null)
       setAnswer('')
       setQLeaderboard([])
       setTriviaIndex(Math.floor(Math.random() * F1_TRIVIA.length))
@@ -152,7 +154,15 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
     channel.on('broadcast', { event: 'game_ended' }, () => {
       setGameState('ended')
     })
+
+    channel.on('broadcast', { event: 'game_closed' }, () => {
+      setGameState('waiting')
+    })
     
+    channel.on('broadcast', { event: 'reveal_correct_answer' }, ({ payload }) => {
+      setRevealedAnswer(payload.correct_answer)
+    })
+
     channel.on('broadcast', { event: 'game_paused' }, () => {
       setGameState('paused')
     })
@@ -194,7 +204,7 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
   }, [user.bitsId])
 
   useEffect(() => {
-    if (gameState === 'playing' && currentQuestion && !hasAnswered) {
+    if (gameState === 'playing' && currentQuestion && !hasAnswered && timer < currentQuestion.time_allotted) {
       timerRef.current = setInterval(() => {
         setTimer(prev => prev + 1)
       }, 1000)
@@ -205,6 +215,14 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
       if (timerRef.current) clearInterval(timerRef.current)
     }
   }, [gameState, currentQuestion, hasAnswered])
+
+  useEffect(() => {
+    if (currentQuestion && timer >= currentQuestion.time_allotted && gameState === 'playing' && !hasAnswered) {
+      if (!result) {
+        setResult({ isCorrect: false, earnedPoints: 0, timeElapsed: currentQuestion.time_allotted, isSkipped: false })
+      }
+    }
+  }, [timer, currentQuestion, gameState, hasAnswered, result])
 
   // Keep gameStateRef in sync so the visibility listener can read it without stale closure
   useEffect(() => {
@@ -519,6 +537,13 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
                           Scored <span className={`text-4xl my-1 font-teko ${result.isSkipped ? 'text-cyan-400' : result.isCorrect ? 'text-green-400' : 'text-red-500'}`}>{result.earnedPoints}</span> pts 
                           <span className="text-gray-600 mt-2 text-[10px] font-mono">(Reaction: {result.timeElapsed}s)</span>
                         </div>
+
+                        {(revealedAnswer && (!result.isCorrect || result.isSkipped)) && (
+                          <div className="mt-5 pt-4 border-t border-red-500/20 text-center fade-in">
+                            <span className="text-[10px] text-gray-500 uppercase tracking-widest block mb-1">Correct Answer</span>
+                            <span className="text-lg font-bold text-green-400 break-words">{revealedAnswer}</span>
+                          </div>
+                        )}
                       </div>
                     )}
 
