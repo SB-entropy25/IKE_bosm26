@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { supabase } from '../supabase.js'
-import { LogOut, Zap, Lock, Unlock, PlayCircle, Info } from 'lucide-react'
+import { LogOut, Zap, Lock, Unlock, PlayCircle, Info, Trophy } from 'lucide-react'
 
 const TRIVIA_FACTS = [
   "The fastest ever pit stop in F1 was 1.80 seconds, performed by McLaren on Lando Norris's car at the 2023 Qatar Grand Prix.",
@@ -13,7 +13,16 @@ const TRIVIA_FACTS = [
   "A Formula 1 engine revs up to 15,000 RPM, which is about two to three times faster than a standard road car."
 ]
 
-export function UserHub({ user, onSpeedRound, onStrategyRound, onLogout }) {
+export function UserHub({ user, onSpeedRound, onStrategyRound, onFinalRound, onLogout }) {
+  const [isFinalist, setIsFinalist] = useState(false)
+
+  useEffect(() => {
+    const checkFinalist = async () => {
+      const { data } = await supabase.from('final_scores').select('bits_id').eq('bits_id', user.bitsId || user.bits_id).single()
+      if (data) setIsFinalist(true)
+    }
+    if (user) checkFinalist()
+  }, [user])
   const [settings, setSettings] = useState({ speed_round_enabled: false, strategy_round_enabled: false })
   const [loading, setLoading] = useState(true)
   const [activeTriviaIndex, setActiveTriviaIndex] = useState(0)
@@ -87,6 +96,36 @@ export function UserHub({ user, onSpeedRound, onStrategyRound, onLogout }) {
               {settings.speed_round_enabled ? <><PlayCircle className="w-5 h-5"/> ENTER QUIZ</> : 'WAITING FOR ADMIN...'}
             </button>
           </div>
+
+          
+          {/* Final Round Card (Only for finalists) */}
+          {isFinalist && (
+            <div className="glass-card p-6 rounded-2xl relative overflow-hidden transition-all duration-300 md:col-span-2 bg-gradient-to-br from-amber-900/40 to-black border-amber-500/30">
+              <div className="absolute top-0 right-0 p-4 opacity-10">
+                <Trophy className="w-32 h-32 text-amber-500" />
+              </div>
+              <div className="relative z-10 flex flex-col h-full">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="p-3 bg-amber-500/20 rounded-xl text-amber-400">
+                    <Trophy className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h3 className="font-teko text-3xl font-bold uppercase tracking-wide text-amber-400">Final Quiz Round</h3>
+                    <span className="text-xs font-bold text-amber-500/70 uppercase tracking-widest">You have qualified!</span>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-300 font-inter mb-6 leading-relaxed">
+                  Welcome to the Finals. Prepare for the ultimate challenge.
+                </p>
+                <button
+                  onClick={onFinalRound}
+                  className="mt-auto w-full py-4 rounded-xl font-bold uppercase tracking-widest transition-all duration-300 bg-amber-600 hover:bg-amber-500 text-white shadow-[0_0_20px_rgba(217,119,6,0.3)] hover:shadow-[0_0_30px_rgba(217,119,6,0.5)]"
+                >
+                  Enter Finals
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Strategy Round Card */}
           <div className={`glass-card p-6 rounded-2xl relative overflow-hidden transition-all duration-300 ${!settings.strategy_round_enabled && 'opacity-60 grayscale'}`}>
@@ -167,3 +206,4 @@ export function UserHub({ user, onSpeedRound, onStrategyRound, onLogout }) {
     </div>
   )
 }
+

@@ -26,7 +26,7 @@ const COMPOUND_CONFIG: Record<Compound, { color: string; bg: string; letter: str
 
 const ACTION_CONFIG = {
   Push:        { emoji: '⚡', color: 'btn-push-active',   idle: 'hover:border-red-500/40 hover:bg-red-950/20',    label: 'PUSH'      },
-  'Save Tires':{ emoji: '🛡️', color: 'btn-save-active',   idle: 'hover:border-emerald-500/40 hover:bg-emerald-950/20', label: 'SAVE TIRES' },
+  'Save Battery':{ emoji: '🛡️', color: 'btn-save-active',   idle: 'hover:border-emerald-500/40 hover:bg-emerald-950/20', label: 'Save Battery' },
   Defend:      { emoji: '🔒', color: 'btn-defend-active', idle: 'hover:border-amber-500/40 hover:bg-amber-950/20', label: 'DEFEND'    },
   Pit:         { emoji: '🔧', color: 'btn-pit-active',    idle: 'hover:border-cyan-500/40 hover:bg-cyan-950/20',  label: 'PIT'       },
 };
@@ -69,34 +69,33 @@ export const PhaseLiveRace: React.FC<PhaseLiveRaceProps> = ({
     const compound = decision === 'Pit' ? selectedCompound : undefined;
 
     const result = processDecision(
-      state, decision, compound, driverProfile, upgrades, raceEvents, gameConfig, currentEvent || undefined
+      state, decision, compound || 'Medium', currentEvent || raceEvents[0], driverProfile, gameConfig
     );
 
     const logEntry: DecisionLog = {
       lap: state.lap,
-      event: currentEvent?.event_type || 'General Stint',
-      short_desc: currentEvent?.short_desc || 'Racing Lap',
+      event_title: currentEvent?.title || 'General Stint',
       decision,
       compound: state.tire_compound,
       tireHealth: state.tire_health,
       position: result.nextState.position,
       gapAhead: result.nextState.gap_ahead,
       gapBehind: result.nextState.gap_behind,
-      commentary: result.commentary,
-      driverRadio: result.driverRadio,
-      impactScore: currentEvent?.hidden_impact || 0,
+      commentary: result.consequence.commentary,
+      driverRadio: result.consequence.driver_radio,
+      impactScore: result.consequence.strategy_score_change,
     };
 
     setDecisionHistory((prev) => [...prev, logEntry]);
     setState(result.nextState);
-    setDriverRadio(result.driverRadio);
-    setCommentary(result.commentary);
+    setDriverRadio(result.consequence.driver_radio);
+    setCommentary(result.consequence.commentary);
 
-    if (result.penaltyOrBonusNote) {
-      setRecentNotification(result.penaltyOrBonusNote);
-      const isPositive = result.penaltyOrBonusNote.includes('MASTERCLASS') || result.penaltyOrBonusNote.includes('FASTEST') || result.penaltyOrBonusNote.includes('TIMELY');
+    if (result.consequence.penalty_bonus_note) {
+      setRecentNotification(result.consequence.penalty_bonus_note);
+      const isPositive = result.consequence.penalty_bonus_note.includes('MASTERCLASS') || result.penaltyOrBonusNote.includes('FASTEST') || result.penaltyOrBonusNote.includes('TIMELY');
       setNotificationType(isPositive ? 'bonus' : 'penalty');
-      if (result.penaltyOrBonusNote.includes('DNF') || result.penaltyOrBonusNote.includes('DISQUALIFIED')) {
+      if (result.consequence.penalty_bonus_note.includes('DNF') || result.consequence.penalty_bonus_note.includes('DISQUALIFIED')) {
         soundManager.playAlert();
       } else if (isPositive) {
         soundManager.playCheer();
@@ -119,22 +118,9 @@ export const PhaseLiveRace: React.FC<PhaseLiveRaceProps> = ({
   };
 
   const getAiRecommendation = (): { action: DecisionAction; reason: string; urgency: 'high' | 'medium' | 'low' } => {
-    if (state.track_dampness > 30 && ['Soft', 'Medium', 'Hard'].includes(state.tire_compound)) {
-      return { action: 'Pit', reason: 'CRITICAL: Track dampness above 30%. Immediate pit for Intermediates or Wets to prevent aquaplaning DNF.', urgency: 'high' };
-    }
-    if (state.tire_health < 30) {
-      return { action: 'Pit', reason: 'Tires below structural cliff (<30%). Box immediately for fresh rubber.', urgency: 'high' };
-    }
-    if (currentEvent?.event_type === 'Safety Car') {
-      return { action: 'Pit', reason: 'Safety Car active — free pit window open. Use it now.', urgency: 'high' };
-    }
-    if (state.gap_ahead < 1.2 && state.ers_percent > 40 && state.tire_health > 50) {
-      return { action: 'Push', reason: 'Within DRS detection zone with healthy battery. Execute push to overtake.', urgency: 'medium' };
-    }
-    if (state.reliability < 40 || state.fuel_load < 15) {
-      return { action: 'Save Tires', reason: 'Lift-and-coast to preserve power unit and fuel reserves.', urgency: 'medium' };
-    }
-    return { action: 'Push', reason: 'Track clear, telemetry nominal. Maintain race delta.', urgency: 'low' };
+    if (state.tire_health < 30) return { action: 'Pit', reason: 'Tires below structural cliff (<30%). Box immediately.', urgency: 'high' };
+    if (state.ers_percent < 30) return { action: 'Save Battery', reason: 'Battery dangerously low. Harvest immediately.', urgency: 'high' };
+    return { action: 'Push', reason: 'Telemetry nominal.', urgency: 'low' };
   };
 
   const aiRec = hasAiAssistant ? getAiRecommendation() : null;
@@ -168,10 +154,6 @@ export const PhaseLiveRace: React.FC<PhaseLiveRaceProps> = ({
             <div className="text-[9px] font-inter uppercase tracking-widest text-cyan-500 font-semibold">Position</div>
             <div className="text-4xl font-teko font-bold text-cyan-300 leading-none">P{state.position}</div>
           </div>
-          <div className="ml-auto text-right">
-            <div className="text-[9px] text-gray-500 font-inter">+{state.gap_ahead.toFixed(1)}s ahead</div>
-            <div className="text-[9px] text-gray-500 font-inter">-{state.gap_behind.toFixed(1)}s behind</div>
-          </div>
         </div>
 
         {/* Tire Compound */}
@@ -186,16 +168,7 @@ export const PhaseLiveRace: React.FC<PhaseLiveRaceProps> = ({
           </div>
         </div>
 
-        {/* Fuel Load */}
-        <div className="flex items-center gap-2 p-3 rounded-xl bg-white/4 border border-white/6">
-          <div>
-            <div className="text-[9px] font-inter uppercase tracking-widest text-gray-500 font-semibold">Fuel</div>
-            <div className={`text-3xl font-teko font-bold leading-none ${state.fuel_load < 15 ? 'text-red-400 critical-flash' : 'text-white'}`}>
-              {state.fuel_load.toFixed(1)}
-            </div>
-            <div className="text-[10px] text-gray-500 font-inter">kg remaining</div>
-          </div>
-        </div>
+
 
         {/* Pit Stops */}
         <div className="flex items-center gap-2 p-3 rounded-xl bg-white/4 border border-white/6">
@@ -228,11 +201,7 @@ export const PhaseLiveRace: React.FC<PhaseLiveRaceProps> = ({
             {/* Gauges Grid */}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
               <TelemetryGauge value={state.tire_health}      title="Tire Health"    unit="%" thresholds={{ warning: 45, danger: 25, invert: false }} />
-              <TelemetryGauge value={state.track_dampness}   title="Track Dampness" unit="%" thresholds={{ warning: 25, danger: 38, invert: true  }} />
-              <TelemetryGauge value={state.fuel_load}        max={110} title="Fuel Load"     unit="kg" thresholds={{ warning: 20, danger: 8,  invert: false }} />
               <TelemetryGauge value={state.ers_percent}      title="ERS Battery"    unit="%" thresholds={{ warning: 30, danger: 15, invert: false }} />
-              <TelemetryGauge value={state.reliability}      title="Reliability"    unit="%" thresholds={{ warning: 45, danger: 25, invert: false }} />
-              <TelemetryGauge value={state.driver_confidence} title="Confidence"    unit="%" thresholds={{ warning: 50, danger: 30, invert: false }} />
             </div>
 
             {/* Weather Radar Widget */}
@@ -290,8 +259,8 @@ export const PhaseLiveRace: React.FC<PhaseLiveRaceProps> = ({
           {/* Current Situation Card */}
           <div className="glass-card p-5 shadow-2xl space-y-4 relative overflow-hidden">
             <div className={`absolute top-0 left-0 right-0 h-[2px] ${
-              currentEvent?.severity === 'Critical' ? 'bg-red-500 glow-red' :
-              currentEvent?.severity === 'High'     ? 'bg-amber-500' :
+              false ? 'bg-red-500 glow-red' :
+              false     ? 'bg-amber-500' :
               'bg-white/20'
             }`} />
 
@@ -299,7 +268,7 @@ export const PhaseLiveRace: React.FC<PhaseLiveRaceProps> = ({
             <div className="flex items-center justify-between gap-2 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="text-xs font-inter font-semibold uppercase tracking-wider px-2.5 py-1 rounded-lg bg-red-600/15 border border-red-500/25 text-red-400">
-                  🚥 {currentEvent?.short_desc || 'Standard Race Pace'}
+                  🚥 {currentEvent?.title || 'Standard Race Pace'}
                 </span>
                 {currentEvent?.event_type && (
                   <span className="text-[10px] font-inter text-gray-500 px-2 py-0.5 rounded bg-white/5 border border-white/8">
@@ -307,16 +276,7 @@ export const PhaseLiveRace: React.FC<PhaseLiveRaceProps> = ({
                   </span>
                 )}
               </div>
-              {currentEvent?.severity && (
-                <span className={`text-[11px] font-inter font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg ${
-                  currentEvent.severity === 'Critical' ? 'badge-critical' :
-                  currentEvent.severity === 'High'     ? 'badge-high' :
-                  currentEvent.severity === 'Medium'   ? 'badge-medium' :
-                  'badge-low'
-                }`}>
-                  {currentEvent.severity}
-                </span>
-              )}
+              
             </div>
 
             {/* Situation Description */}
@@ -447,3 +407,6 @@ export const PhaseLiveRace: React.FC<PhaseLiveRaceProps> = ({
     </div>
   );
 };
+
+
+

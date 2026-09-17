@@ -20,7 +20,7 @@ const F1_TRIVIA = [
   "F1 drivers experience up to 6G of force during hard cornering and braking — more than astronauts at launch!"
 ]
 
-export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
+export function FinalRound({ user, soundEnabled, onBack, onLogout }) {
   const [gameState, setGameState] = useState('waiting')
   const [currentQuestion, setCurrentQuestion] = useState(null)
   const [result, setResult] = useState(null)
@@ -77,10 +77,10 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
         }
       }
 
-      const { data: lb } = await supabase.from('speed_scores').select('*').order('score', { ascending: false })
+      const { data: lb } = await supabase.from('final_scores').select('*').order('score', { ascending: false })
       if (lb) setLeaderboard(lb)
         
-      const { data: usRow } = await supabase.from('speed_scores').select('avatar_name').eq('bits_id', user.bitsId).single()
+      const { data: usRow } = await supabase.from('final_scores').select('avatar_name').eq('bits_id', user.bitsId).single()
       if (usRow && usRow.avatar_name) {
           setAvatarName(usRow.avatar_name)
           setIsAvatarSet(true)
@@ -90,8 +90,8 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
 
     // 2. Realtime Subscriptions for DB changes (Settings & Scores)
     const dbSub = supabase.channel('speed-player-db')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'speed_scores' }, async () => {
-        const { data } = await supabase.from('speed_scores').select('*').order('score', { ascending: false })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'final_scores' }, async () => {
+        const { data } = await supabase.from('final_scores').select('*').order('score', { ascending: false })
         if (data) setLeaderboard(data)
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'hub_settings' }, (payload) => {
@@ -102,7 +102,7 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
       .subscribe()
 
     // 3. Game Room Channel for events
-    const channel = supabase.channel('game-room', {
+    const channel = supabase.channel('final-room', {
       config: { presence: { key: user.bitsId } }
     })
     channelRef.current = channel
@@ -183,7 +183,7 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
           setIsFlagged(false)
         } else if (payload.action === 'kick') {
           alert("You have been kicked by the admin.")
-          if (onLogout) onLogout()
+          if (onBack) onBack()
         } else if (payload.action === 'deduct') {
           alert(`WARNING: The admin has deducted ${payload.amount} points from your score due to multiple tab changes.`)
         } else if (payload.action === 'message') {
@@ -255,7 +255,7 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
               switchCount: newCount,
               qSwitchCount: qSwitchCountRef.current,
               flagged: newCount >= TAB_SWITCH_LIMIT,
-              reason: `Tab switched ${newCount} time${newCount !== 1 ? 's' : ''} during Speed Round`
+              reason: `Tab switched ${newCount} time${newCount !== 1 ? 's' : ''} during Final Quiz Round`
             }
           })
         }
@@ -269,7 +269,7 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
   const saveAvatarName = async (e) => {
     e.preventDefault()
     if (!avatarName.trim()) return
-    await supabase.from('speed_scores').update({ avatar_name: avatarName.trim() }).eq('bits_id', user.bitsId)
+    await supabase.from('final_scores').update({ avatar_name: avatarName.trim() }).eq('bits_id', user.bitsId)
     setIsAvatarSet(true)
   }
 
@@ -349,10 +349,10 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-[#161920] border-b border-[#232730] shadow-sm z-10 shrink-0">
         <button onClick={onBack} className="flex items-center gap-2 text-xs text-gray-400 hover:text-white transition font-inter font-semibold uppercase tracking-wider">
-          <ChevronLeft className="w-4 h-4" /> Exit Speed Round
+          <ChevronLeft className="w-4 h-4" /> Exit Final Quiz Round
         </button>
         <div className="text-white font-teko text-2xl tracking-widest font-bold flex items-center gap-3 italic">
-          <span className="text-red-600">F1 QUIZ</span> SPEED ROUND
+          <span className="text-red-600">F1 QUIZ</span> Final Quiz Round
           <button onClick={() => setShowInstructions(true)} className="text-gray-500 hover:text-white transition">
             <Info className="w-5 h-5" />
           </button>
@@ -631,4 +631,6 @@ export function SpeedRound({ user, soundEnabled, onBack, onLogout }) {
     </div>
   )
 }
+
+
 

@@ -2,10 +2,14 @@ import React, { useEffect, useState } from 'react'
 import { supabase } from '../supabase.js'
 import { LogOut, Users, Play, StopCircle, RefreshCw, Download, Zap, Brain, Trophy } from 'lucide-react'
 import { SpeedRoundAdmin } from './SpeedRoundAdmin.jsx'
+import { StrategyRoundAdmin } from './StrategyRoundAdmin.jsx'
+import { FinalRoundAdmin } from './FinalRoundAdmin.jsx'
+import { FinalsSetup } from './FinalsSetup.jsx'
 
 export function AdminPanel({ onLogout }) {
   const [settings, setSettings] = useState(null)
   const [users, setUsers] = useState([])
+  const [hasFinals, setHasFinals] = useState(false)
   const [loading, setLoading] = useState(true)
   const [view, setView] = useState('main')
   
@@ -26,26 +30,26 @@ export function AdminPanel({ onLogout }) {
     const { data: hubUsers } = await supabase.from('hub_users').select('*')
     const { data: speed } = await supabase.from('speed_scores').select('*')
     const { data: strategy } = await supabase.from('strategy_scores').select('*')
+    const { data: final } = await supabase.from('final_scores').select('*')
 
     if (hubUsers && speed && strategy && setts) {
       const combined = hubUsers.map(u => {
         const sScore = speed.find(s => s.bits_id === u.bits_id)?.score || 0
         const stScore = strategy.find(s => s.bits_id === u.bits_id)?.score || 0
+        const fScore = final?.find(f => f.bits_id === u.bits_id)?.score || 0
         
-        // Calculate Net Score based on weighting
-        // e.g. Strategy Weight = 60%, Speed = 40%
         const stWeight = setts.strategy_weight / 100
         const spWeight = 1 - stWeight
         
-        // Speed score is max ~1000? Assuming similar scales. If not, normalization needed.
-        const netScore = Math.round((sScore * spWeight) + (stScore * stWeight))
+        const netBaseScore = Math.round((sScore * spWeight) + (stScore * stWeight))
+        const netScore = netBaseScore + fScore
 
-        return { ...u, speedScore: sScore, strategyScore: stScore, netScore }
+        return { ...u, speedScore: sScore, strategyScore: stScore, finalScore: fScore, netScore }
       })
       
-      // Sort by net score desc
       combined.sort((a, b) => b.netScore - a.netScore)
       setUsers(combined)
+      setHasFinals(final && final.length > 0)
     }
     setLoading(false)
   }
@@ -99,8 +103,8 @@ export function AdminPanel({ onLogout }) {
   }
 
   const exportCSV = () => {
-    const headers = ['Rank', 'Name', 'BITS_ID', 'Speed_Score', 'Strategy_Score', 'Net_Score']
-    const rows = users.map((u, i) => [i + 1, u.name, u.bits_id, u.speedScore, u.strategyScore, u.netScore])
+    const headers = ['Rank', 'Name', 'BITS_ID', 'Speed_Score', 'Strategy_Score', 'Final_Score', 'Net_Score']
+    const rows = users.map((u, i) => [i + 1, u.name, u.bits_id, u.speedScore, u.strategyScore, u.finalScore, u.netScore])
     
     let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n"
     rows.forEach(row => { csvContent += row.join(",") + "\n" })
@@ -117,6 +121,9 @@ export function AdminPanel({ onLogout }) {
   if (loading || !settings) return <div className="text-center p-12 text-white">Loading Admin Panel...</div>
 
   if (view === 'speed') return <SpeedRoundAdmin onBack={() => setView('main')} />
+  if (view === 'strategy') return <StrategyRoundAdmin onBack={() => setView('main')} />
+  if (view === 'final_setup') return <FinalsSetup onBack={() => setView('main')} onLaunch={() => setView('final_admin')} />
+  if (view === 'final_admin') return <FinalRoundAdmin onBack={() => setView('main')} />
 
   return (
     <div className="min-h-screen p-6 bg-slate-950 text-gray-200 font-inter">
@@ -162,7 +169,30 @@ export function AdminPanel({ onLogout }) {
                 </button>
               </div>
 
-              <div className="flex items-center justify-between p-4 bg-slate-950 rounded-xl border border-slate-800">
+              <div className="flex flex-col p-4 bg-slate-950 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-3 mb-2">
+                  <Trophy className="w-5 h-5 text-cyan-400" />
+                  <span className="font-bold text-white">Strategy Sim Control</span>
+                </div>
+                <p className="text-xs text-slate-400 mb-4">View finished runs, reset player attempts, and manage scores.</p>
+                <button onClick={() => setView('strategy')} className="w-full mt-auto py-2 text-xs font-bold uppercase text-cyan-400 bg-cyan-950/40 hover:bg-cyan-900/50 border border-cyan-900/50 rounded-lg transition">
+                  Enter Strategy Sim Control Room ➔
+                </button>
+              </div>
+
+              
+              <div className="flex flex-col p-4 bg-slate-950 rounded-xl border border-slate-800">
+                <div className="flex items-center gap-3 mb-2">
+                  <Trophy className="w-5 h-5 text-amber-500" />
+                  <span className="font-bold text-white">Final Quiz Round</span>
+                </div>
+                <p className="text-xs text-slate-400 mb-4">Configure finalists and run the final quiz.</p>
+                <button onClick={() => setView('final_setup')} className="w-full mt-auto py-2 text-xs font-bold uppercase text-amber-400 bg-amber-950/40 hover:bg-amber-900/50 border border-amber-900/50 rounded-lg transition">
+                  Enter Finals Control Room ??
+                </button>
+              </div>
+
+                <div className="flex items-center justify-between p-4 bg-slate-950 rounded-xl border border-slate-800">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-lg ${settings.strategy_round_enabled ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800 text-slate-500'}`}><Brain className="w-5 h-5"/></div>
                   <div>
@@ -293,7 +323,8 @@ export function AdminPanel({ onLogout }) {
                     <td className="py-3 px-4 text-xs text-gray-400 font-mono">{u.email || '—'}</td>
                     <td className="py-3 px-4 text-right text-red-300">{u.speedScore}</td>
                     <td className="py-3 px-4 text-right text-cyan-300">{u.strategyScore}</td>
-                    <td className="py-3 px-4 text-right font-bold text-amber-400 text-base">{u.netScore}</td>
+                    <td className="py-3 px-4 text-right text-amber-400">{u.finalScore}</td>
+                    <td className="py-3 px-4 text-right font-bold text-white text-base">{u.netScore}</td>
                   </tr>
                 ))}
               </tbody>
@@ -305,3 +336,6 @@ export function AdminPanel({ onLogout }) {
     </div>
   )
 }
+
+
+

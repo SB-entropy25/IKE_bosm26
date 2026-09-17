@@ -61,8 +61,21 @@ export const App: React.FC<{ user?: any, onExit?: () => void }> = ({ user, onExi
   };
 
   useEffect(() => {
-    verifyDb();
-  }, []);
+    const checkServerPlayStatus = async () => {
+      if (user && user.bitsId) {
+        const { data, error } = await supabase.from('strategy_scores').select('bits_id, score').eq('bits_id', user.bitsId).single();
+          if (data && data.score > 0) {
+          // User already played!
+          alert('You have already submitted this round.');
+            if (onExit) onExit();
+          else window.location.href = '/';
+          return;
+        }
+      }
+      verifyDb();
+    };
+    checkServerPlayStatus();
+  }, [user]);
 
   const toggleAudio = () => {
     const next = !soundEnabled;
@@ -104,13 +117,13 @@ export const App: React.FC<{ user?: any, onExit?: () => void }> = ({ user, onExi
       
       if (user) {
          // Hub Integration: Save directly to unified strategy_scores table using Supabase client
-         await supabase.from('strategy_scores').upsert({
-            bits_id: user.bitsId,
-            principal_name: principalName,
-            team_name: teamName,
-            score: breakdown.total_score,
-            updated_at: new Date().toISOString()
-         }, { onConflict: 'bits_id' });
+         const { error: dbError } = await supabase.from('strategy_scores').upsert({
+              bits_id: user.bitsId,
+                name: principalName || user.name,
+                score: breakdown.total_score,
+              updated_at: new Date().toISOString()
+           }, { onConflict: 'bits_id' });
+             if (dbError) { console.error('Error saving score:', dbError); alert('DB SAVE FAILED: ' + dbError.message + ' (Details: ' + dbError.details + ')'); }
       } else {
          // Standalone F1 fallback
          const participant: ParticipantRecord = {
@@ -132,7 +145,7 @@ export const App: React.FC<{ user?: any, onExit?: () => void }> = ({ user, onExi
       }
     }
 
-    setPhase('debrief');
+          setPhase('debrief');
   };
 
   const handleRestart = () => {
@@ -285,4 +298,11 @@ export const App: React.FC<{ user?: any, onExit?: () => void }> = ({ user, onExi
 };
 
 export default App;
+
+
+
+
+
+
+
 

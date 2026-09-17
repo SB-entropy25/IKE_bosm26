@@ -8,6 +8,7 @@ import { UserHub } from './components/UserHub.jsx'
 import { AdminPanel } from './components/AdminPanel.jsx'
 import { SpeedRound } from './components/SpeedRound.jsx'
 import { StrategyRound } from './components/StrategyRound.jsx'
+import { FinalRound } from './components/FinalRound.jsx'
 
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -186,6 +187,7 @@ export default function App() {
         <UserHub
           user={user}
           onSpeedRound={() => setView('speedRound')}
+          onFinalRound={() => setView('finalRound')}
           onStrategyRound={() => setView('strategyRound')}
           onLogout={handleLogout}
         />
@@ -197,6 +199,10 @@ export default function App() {
 
       {view === 'speedRound' && user && (
         <SpeedRound user={user} onBack={() => setView('userHub')} onLogout={handleLogout} />
+      )}
+
+      {view === 'finalRound' && user && (
+        <FinalRound user={user} onBack={() => setView('userHub')} onLogout={handleLogout} />
       )}
 
       {view === 'strategyRound' && user && (
@@ -213,3 +219,4 @@ export default function App() {
     </ErrorBoundary>
   )
 }
+

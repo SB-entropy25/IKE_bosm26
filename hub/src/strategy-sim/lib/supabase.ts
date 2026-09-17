@@ -17,7 +17,24 @@ export async function checkConnection(): Promise<{ connected: boolean; message: 
 }
 
 export async function saveParticipantToDatabase(record: ParticipantRecord): Promise<{ success: boolean; error?: string }> {
-  return { success: true };
+  try {
+    const { error } = await supabase
+      .from('strategy_scores')
+      .upsert({
+        bits_id: record.driver_profile.driver_id,
+        name: record.principal_name,
+        score: record.total_score,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'bits_id' });
+    if (error) {
+      console.error('Supabase save error:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error('Catch save error:', err);
+    return { success: false, error: err.message };
+  }
 }
 
 export async function fetchLeaderboard(): Promise<ParticipantRecord[]> {
@@ -109,3 +126,7 @@ export async function fetchGameConfig(): Promise<GameConfig> {
     return DEFAULT_GAME_CONFIG;
   }
 }
+
+
+
+

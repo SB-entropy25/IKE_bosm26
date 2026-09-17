@@ -2,13 +2,13 @@ import React, { useState, useEffect, useRef } from 'react'
 import { ChevronLeft, Edit3, Settings, Play, Save, Check, X, Clock, Database, Users, Monitor, UserX, Plus, Minus, List, Download } from 'lucide-react'
 import { supabase } from '../supabase.js'
 
-export function SpeedRoundAdmin({ onBack }) {
+export function FinalRoundAdmin({ onBack }) {
   const [gameState, setGameState] = useState('waiting')
   const [leaderboard, setLeaderboard] = useState([])
   const [questions, setQuestions] = useState([])
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(-1)
   
-  const [activeTab, setActiveTab] = useState('control') // 'control', 'questions', 'roster'
+  const [activeTab, setActiveTab] = useState('control') // 'control', 'final_questions', 'roster'
   const [editingQuestion, setEditingQuestion] = useState(null)
   
   const [showPlayerLeaderboard, setShowPlayerLeaderboard] = useState(false)
@@ -36,12 +36,12 @@ export function SpeedRoundAdmin({ onBack }) {
   }, [currentQuestionIndex, questions])
 
   const fetchQuestions = async () => {
-    const { data } = await supabase.from('questions').select('*').order('sort_order', { ascending: true })
+    const { data } = await supabase.from('final_questions').select('*').order('sort_order', { ascending: true })
     if (data) setQuestions(data)
   }
 
   const fetchLB = async () => {
-    const { data } = await supabase.from('speed_scores').select('*').order('score', { ascending: false })
+    const { data } = await supabase.from('final_scores').select('*').order('score', { ascending: false })
     if (data) setLeaderboard(data)
   }
 
@@ -80,7 +80,7 @@ export function SpeedRoundAdmin({ onBack }) {
     })
 
     const dbSub = supabase.channel('speed-scores-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'speed_scores' }, async () => {
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'final_scores' }, async () => {
         fetchLB()
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'hub_settings' }, (payload) => {
@@ -90,7 +90,7 @@ export function SpeedRoundAdmin({ onBack }) {
       })
       .subscribe()
 
-    const channel = supabase.channel('game-room')
+    const channel = supabase.channel('final-room')
     channelRef.current = channel
 
     channel.on('broadcast', { event: 'submit_answer' }, async ({ payload }) => {
@@ -131,9 +131,9 @@ export function SpeedRoundAdmin({ onBack }) {
       qLeaderboardRef.current.push(resultPayload)
 
       if (earnedPoints > 0) {
-        const { data: userRow } = await supabase.from('speed_scores').select('score').eq('bits_id', bitsId).single()
+        const { data: userRow } = await supabase.from('final_scores').select('score').eq('bits_id', bitsId).single()
         if (userRow) {
-          await supabase.from('speed_scores').update({ score: userRow.score + earnedPoints }).eq('bits_id', bitsId)
+          await supabase.from('final_scores').update({ score: userRow.score + earnedPoints }).eq('bits_id', bitsId)
         }
       }
 
@@ -218,18 +218,7 @@ export function SpeedRoundAdmin({ onBack }) {
   }
 
   const confirmStartGame = async () => {
-    if (startConfig.wipeScores) {
-      if (!window.confirm("WARNING: You selected to WIPE ALL SCORES. This will permanently reset all player points to 0. Are you absolutely sure?")) {
-        return; // Abort if they cancel
-      }
-    }
-    
     setShowStartModal(false)
-    
-    if (startConfig.wipeScores) {
-      await supabase.from('speed_scores').update({ score: 0 }).neq('bits_id', '')
-      setCorrectCounts({})
-    }
 
     const sIdx = startConfig.startIndex
     setGameState('playing')
@@ -317,8 +306,8 @@ export function SpeedRoundAdmin({ onBack }) {
           payload: { targetId: bitsId, action: 'kick' }
         })
       }
-      await supabase.from('speed_scores').delete().eq('bits_id', bitsId)
-      await supabase.from('hub_users').delete().eq('bits_id', bitsId)
+      await supabase.from('final_scores').delete().eq('bits_id', bitsId)
+      
       fetchLB()
     }
   }
@@ -364,7 +353,7 @@ export function SpeedRoundAdmin({ onBack }) {
 
   const deductScore = async (bitsId, currentScore, amount = 10) => {
     const newScore = Math.max(0, currentScore - amount)
-    await supabase.from('speed_scores').update({ score: newScore }).eq('bits_id', bitsId)
+    await supabase.from('final_scores').update({ score: newScore }).eq('bits_id', bitsId)
     fetchLB()
     if (notifyOnDeduct && channelRef.current) {
       channelRef.current.send({
@@ -393,7 +382,7 @@ export function SpeedRoundAdmin({ onBack }) {
     if (!editingQuestion) return
     
     if (editingQuestion.id) {
-      const { error } = await supabase.from('questions').update({
+      const { error } = await supabase.from('final_questions').update({
         text: editingQuestion.text,
         time_allotted: editingQuestion.time_allotted,
         max_points: editingQuestion.max_points,
@@ -408,7 +397,7 @@ export function SpeedRoundAdmin({ onBack }) {
         alert('Error updating question')
       }
     } else {
-      const { error } = await supabase.from('questions').insert({
+      const { error } = await supabase.from('final_questions').insert({
         type: editingQuestion.type,
         text: editingQuestion.text,
         time_allotted: editingQuestion.time_allotted,
@@ -470,7 +459,7 @@ export function SpeedRoundAdmin({ onBack }) {
   const exportResultsToCSV = async () => {
     try {
       const { data: usersData, error: usersErr } = await supabase.from('hub_users').select('*')
-      const { data: scoresData, error: scoresErr } = await supabase.from('speed_scores').select('*')
+      const { data: scoresData, error: scoresErr } = await supabase.from('final_scores').select('*')
       const { data: strategyData, error: strategyErr } = await supabase.from('strategy_scores').select('*')
       
       if (usersErr || scoresErr || strategyErr) {
@@ -544,7 +533,7 @@ export function SpeedRoundAdmin({ onBack }) {
           <button onClick={() => setActiveTab('control')} className={`px-4 py-2 rounded-lg font-semibold text-sm transition flex items-center gap-2 ${activeTab === 'control' ? 'bg-red-600 text-white' : 'bg-[#232730] text-gray-400 hover:text-white'}`}>
             <Play className="w-4 h-4"/> Race Control
           </button>
-          <button onClick={() => setActiveTab('questions')} className={`px-4 py-2 rounded-lg font-semibold text-sm transition flex items-center gap-2 ${activeTab === 'questions' ? 'bg-cyan-600 text-white' : 'bg-[#232730] text-gray-400 hover:text-white'}`}>
+          <button onClick={() => setActiveTab('final_questions')} className={`px-4 py-2 rounded-lg font-semibold text-sm transition flex items-center gap-2 ${activeTab === 'final_questions' ? 'bg-cyan-600 text-white' : 'bg-[#232730] text-gray-400 hover:text-white'}`}>
             <Database className="w-4 h-4"/> Question Manager
           </button>
           <button onClick={() => setActiveTab('roster')} className={`px-4 py-2 rounded-lg font-semibold text-sm transition flex items-center gap-2 ${activeTab === 'roster' ? 'bg-purple-600 text-white' : 'bg-[#232730] text-gray-400 hover:text-white'}`}>
@@ -581,7 +570,7 @@ export function SpeedRoundAdmin({ onBack }) {
                   </button>
                   <button 
                     onClick={async () => {
-                      if(!window.confirm("Terminate the entire speed round session?")) return;
+                      if(!window.confirm("Terminate the entire Final Quiz Round session?")) return;
                       setGameState('ended')
                       setProjectorView('overall')
                       localStorage.setItem('admin_game_state', 'ended')
@@ -933,7 +922,7 @@ export function SpeedRoundAdmin({ onBack }) {
         {/* =========================================
              QUESTION MANAGER TAB
         ============================================= */}
-        {activeTab === 'questions' && (
+        {activeTab === 'final_questions' && (
           <div className="flex gap-6 h-full">
             
             {/* List */}
@@ -1103,18 +1092,7 @@ export function SpeedRoundAdmin({ onBack }) {
                 </select>
               </div>
 
-              <div className="flex items-center gap-4 bg-[#0f1115] p-4 rounded-xl border border-red-900/30">
-                <input 
-                  type="checkbox" 
-                  id="wipeScores"
-                  checked={startConfig.wipeScores}
-                  onChange={e => setStartConfig(p => ({ ...p, wipeScores: e.target.checked }))}
-                  className="w-5 h-5 accent-red-500 rounded cursor-pointer"
-                />
-                <label htmlFor="wipeScores" className="text-sm font-bold text-red-400 cursor-pointer">
-                  Wipe all current scores to 0
-                </label>
-              </div>
+              
             </div>
 
             <div className="flex gap-4 mt-10">
@@ -1138,3 +1116,5 @@ export function SpeedRoundAdmin({ onBack }) {
     </div>
   )
 }
+
+

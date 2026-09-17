@@ -131,12 +131,6 @@ export const PhaseDebrief: React.FC<PhaseDebriefProps> = ({
             >
               <Users className="w-4 h-4" /> VIEW GLOBAL MULTIPLAYER LEADERBOARD ➔
             </button>
-            <button
-              onClick={onRestart}
-              className="w-full py-2.5 rounded-xl font-teko text-lg tracking-wider uppercase text-gray-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 flex items-center justify-center gap-2 transition"
-            >
-              <RotateCcw className="w-4 h-4" /> Run New Grand Prix Simulation
-            </button>
           </div>
         </div>
 

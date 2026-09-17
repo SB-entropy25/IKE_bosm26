@@ -140,14 +140,14 @@ export const LiveLeaderboard: React.FC<LiveLeaderboardProps> = ({
           >
             <Download className="w-4 h-4" /> Export CSV / Excel
           </button>
-          {onBackToSimulation && (
+          <div className="flex gap-3">
             <button
-              onClick={onBackToSimulation}
+              onClick={() => { window.location.href = '/'; }}
               className="px-5 py-2.5 rounded-xl font-teko text-xl font-bold tracking-wider uppercase text-white bg-gradient-to-r from-red-600 to-red-700 hover:from-red-500 hover:to-red-600 transition"
             >
               Command Center ➔
             </button>
-          )}
+          </div>
         </div>
       </div>
 
