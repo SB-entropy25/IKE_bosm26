@@ -18,7 +18,7 @@ export function createInitialRaceState(): RaceState {
 
 export function getLogicalEvent(state: RaceState, raceEvents: RaceEvent[], usedEvents: number[] = []): RaceEvent {
   // Find all events whose conditions are met
-  let possibleEvents = raceEvents.filter(e => e.conditions(state));
+  let possibleEvents = raceEvents.filter(e => e.conditions(state) && !usedEvents.includes(e.id));
   
   if (possibleEvents.length === 0) {
     // Fallback to the standard cruise event
@@ -73,4 +73,5 @@ export function processDecision(
 
   return { nextState, consequence };
 }
+
 

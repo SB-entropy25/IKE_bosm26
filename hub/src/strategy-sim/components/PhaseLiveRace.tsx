@@ -95,7 +95,7 @@ export const PhaseLiveRace: React.FC<PhaseLiveRaceProps> = ({
 
     if (result.consequence.penalty_bonus_note) {
       setRecentNotification(result.consequence.penalty_bonus_note);
-      const isPositive = result.consequence.penalty_bonus_note.includes('MASTERCLASS') || result.penaltyOrBonusNote.includes('FASTEST') || result.penaltyOrBonusNote.includes('TIMELY');
+      const isPositive = result.consequence.penalty_bonus_note.includes('MASTERCLASS') || result.consequence.penalty_bonus_note.includes('FASTEST') || result.consequence.penalty_bonus_note.includes('TIMELY');
       setNotificationType(isPositive ? 'bonus' : 'penalty');
       if (result.consequence.penalty_bonus_note.includes('DNF') || result.consequence.penalty_bonus_note.includes('DISQUALIFIED')) {
         soundManager.playAlert();
@@ -410,6 +410,7 @@ export const PhaseLiveRace: React.FC<PhaseLiveRaceProps> = ({
     </div>
   );
 };
+
 
 
 
