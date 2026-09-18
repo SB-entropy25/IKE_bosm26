@@ -90,10 +90,15 @@ export function FinalRound({ user, soundEnabled, onBack, onLogout }) {
 
     // 2. Realtime Subscriptions for DB changes (Settings & Scores)
     const dbSub = supabase.channel('speed-player-db')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'final_scores' }, async () => {
-        const { data } = await supabase.from('final_scores').select('*').order('score', { ascending: false })
-        if (data) setLeaderboard(data)
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'final_scores' }, () => {
+          if (!window._lbTimeoutFinal) {
+            window._lbTimeoutFinal = setTimeout(async () => {
+              const { data } = await supabase.from('final_scores').select('*').order('score', { ascending: false })
+              if (data) setLeaderboard(data)
+              window._lbTimeoutFinal = null
+            }, 2000)
+          }
+        })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'hub_settings' }, (payload) => {
         if (payload.new && payload.new.show_speed_leaderboard !== undefined) {
           setShowPlayerLeaderboard(payload.new.show_speed_leaderboard)

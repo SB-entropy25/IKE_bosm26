@@ -80,9 +80,14 @@ export function FinalRoundAdmin({ onBack }) {
     })
 
     const dbSub = supabase.channel('speed-scores-changes')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'final_scores' }, async () => {
-        fetchLB()
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'final_scores' }, () => {
+          if (!window._adminLbTimeoutFinal) {
+            window._adminLbTimeoutFinal = setTimeout(() => {
+              fetchLB()
+              window._adminLbTimeoutFinal = null
+            }, 2000)
+          }
+        })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'hub_settings' }, (payload) => {
         if (payload.new && payload.new.show_speed_leaderboard !== undefined) {
           setShowPlayerLeaderboard(payload.new.show_speed_leaderboard)
@@ -394,7 +399,7 @@ export function FinalRoundAdmin({ onBack }) {
         await fetchQuestions()
         setEditingQuestion(null)
       } else {
-        alert('Error updating question')
+        alert('Error updating question: ' + JSON.stringify(error))
       }
     } else {
       const { error } = await supabase.from('final_questions').insert({
@@ -410,7 +415,7 @@ export function FinalRoundAdmin({ onBack }) {
         await fetchQuestions()
         setEditingQuestion(null)
       } else {
-        alert('Error creating question')
+        alert('Error creating question: ' + JSON.stringify(error))
       }
     }
   }
@@ -1116,6 +1121,7 @@ export function FinalRoundAdmin({ onBack }) {
     </div>
   )
 }
+
 
 
 
