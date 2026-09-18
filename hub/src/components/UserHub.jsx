@@ -99,7 +99,7 @@ export function UserHub({ user, onSpeedRound, onStrategyRound, onFinalRound, onL
 
           
           {/* Final Round Card (Only for finalists) */}
-          {isFinalist && (
+          {isFinalist && settings.final_round_enabled && (
             <div className="glass-card p-6 rounded-2xl relative overflow-hidden transition-all duration-300 md:col-span-2 bg-gradient-to-br from-amber-900/40 to-black border-amber-500/30">
               <div className="absolute top-0 right-0 p-4 opacity-10">
                 <Trophy className="w-32 h-32 text-amber-500" />
@@ -206,4 +206,5 @@ export function UserHub({ user, onSpeedRound, onStrategyRound, onFinalRound, onL
     </div>
   )
 }
+
 

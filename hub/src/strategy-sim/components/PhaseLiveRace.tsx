@@ -41,6 +41,7 @@ export const PhaseLiveRace: React.FC<PhaseLiveRaceProps> = ({
 }) => {
   const [state, setState] = useState<RaceState>(initialRaceState);
   const [currentEvent, setCurrentEvent] = useState<RaceEvent | null>(null);
+  const [usedEventIds, setUsedEventIds] = useState<number[]>([]);
   const [driverRadio, setDriverRadio] = useState<string>('Radio check pit wall, telemetry sync 100%. Standing by for stint orders.');
   const [commentary, setCommentary] = useState<string>('Grand Prix green flag! Field is charging through Sector 1.');
   const [decisionHistory, setDecisionHistory] = useState<DecisionLog[]>([]);
@@ -55,7 +56,8 @@ export const PhaseLiveRace: React.FC<PhaseLiveRaceProps> = ({
 
   useEffect(() => {
     if (raceEvents.length > 0) {
-      const firstEvt = getLogicalEvent(state, raceEvents);
+      const firstEvt = getLogicalEvent(state, raceEvents, []);
+      setUsedEventIds([firstEvt.id]);
       setCurrentEvent(firstEvt);
     }
   }, [raceEvents]);
@@ -113,7 +115,8 @@ export const PhaseLiveRace: React.FC<PhaseLiveRaceProps> = ({
       return;
     }
 
-    const nextEvt = getLogicalEvent(result.nextState, raceEvents);
+    const nextEvt = getLogicalEvent(result.nextState, raceEvents, usedEventIds);
+    setUsedEventIds(prev => [...prev, nextEvt.id]);
     setCurrentEvent(nextEvt);
   };
 

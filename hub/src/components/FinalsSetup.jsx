@@ -54,6 +54,7 @@ export function FinalsSetup({ onBack, onLaunch }) {
       return;
     }
 
+    await supabase.from('hub_settings').update({ final_round_enabled: true }).neq('id', 0);
     onLaunch();
   };
 
@@ -121,3 +122,4 @@ export function FinalsSetup({ onBack, onLaunch }) {
     </div>
   );
 }
+

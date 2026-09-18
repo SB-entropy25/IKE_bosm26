@@ -110,8 +110,7 @@ export function SpeedRoundAdmin({ onBack }) {
       let isSkipped = answer === '__SKIP__'
 
       if (isSkipped) {
-        if (timeElapsed <= 10) earnedPoints = 5
-        else earnedPoints = 0
+        earnedPoints = 0; // Speed round has no bonus for skipping, but avoids the -5 penalty
       } else {
         if (currentQ.type === 'mcq') {
           isCorrect = answer === currentQ.correct_answer
@@ -122,15 +121,16 @@ export function SpeedRoundAdmin({ onBack }) {
         if (isCorrect) {
           const penalties = Math.floor(timeElapsed / 5) 
           earnedPoints = Math.max(10, currentQ.max_points - (penalties * 5)) 
+        } else {
+          earnedPoints = -5 // Penalty for wrong answer
         }
-      }
-
+      } 
       const resultPayload = { bitsId, name, avatarName, isCorrect, earnedPoints, timeElapsed, isSkipped }
       
       // Immediately add to ref to block further dupes while DB updates
       qLeaderboardRef.current.push(resultPayload)
 
-      if (earnedPoints > 0) {
+      if (earnedPoints !== 0) {
         const { data: userRow } = await supabase.from('speed_scores').select('score').eq('bits_id', bitsId).single()
         if (userRow) {
           await supabase.from('speed_scores').update({ score: userRow.score + earnedPoints }).eq('bits_id', bitsId)
@@ -769,7 +769,7 @@ export function SpeedRoundAdmin({ onBack }) {
                                <span className="text-sm text-gray-400">{u.timeElapsed}s reaction</span>
                              </div>
                            </div>
-                           <span className={`font-black text-4xl font-teko ${u.isCorrect ? 'text-green-400' : u.isSkipped ? 'text-cyan-400' : 'text-red-600'}`}>+{u.earnedPoints}</span>
+                           <span className={`font-black text-4xl font-teko ${u.isCorrect ? 'text-green-400' : u.isSkipped ? 'text-cyan-400' : 'text-red-600'}`}>{u.earnedPoints > 0 ? '+' : ''}{u.earnedPoints}</span>
                          </div>
                        ))}
                      </div>
@@ -1138,3 +1138,5 @@ export function SpeedRoundAdmin({ onBack }) {
     </div>
   )
 }
+
+

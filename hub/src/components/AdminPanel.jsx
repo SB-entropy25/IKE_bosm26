@@ -44,7 +44,7 @@ export function AdminPanel({ onLogout }) {
         const netBaseScore = Math.round((sScore * spWeight) + (stScore * stWeight))
         const netScore = netBaseScore + fScore
 
-        return { ...u, speedScore: sScore, strategyScore: stScore, finalScore: fScore, netScore }
+        return { ...u, speedScore: sScore, strategyScore: stScore, finalScore: fScore, finalQsCorrect: final?.find(f => f.bits_id === u.bits_id)?.correct_answers || 0, netScore }
       })
       
       combined.sort((a, b) => b.netScore - a.netScore)
@@ -103,8 +103,8 @@ export function AdminPanel({ onLogout }) {
   }
 
   const exportCSV = () => {
-    const headers = ['Rank', 'Name', 'BITS_ID', 'Speed_Score', 'Strategy_Score', 'Final_Score', 'Net_Score']
-    const rows = users.map((u, i) => [i + 1, u.name, u.bits_id, u.speedScore, u.strategyScore, u.finalScore, u.netScore])
+    const headers = ['Rank', 'Name', 'BITS_ID', 'Speed_Score', 'Strategy_Score', 'Final_Score', 'Final_Qs_Correct', 'Net_Score']
+    const rows = users.map((u, i) => [i + 1, u.name, u.bits_id, u.speedScore, u.strategyScore, u.finalScore, u.finalQsCorrect, u.netScore])
     
     let csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n"
     rows.forEach(row => { csvContent += row.join(",") + "\n" })
@@ -187,12 +187,28 @@ export function AdminPanel({ onLogout }) {
                   <span className="font-bold text-white">Final Quiz Round</span>
                 </div>
                 <p className="text-xs text-slate-400 mb-4">Configure finalists and run the final quiz.</p>
-                <button onClick={() => setView('final_setup')} className="w-full mt-auto py-2 text-xs font-bold uppercase text-amber-400 bg-amber-950/40 hover:bg-amber-900/50 border border-amber-900/50 rounded-lg transition">
-                  Enter Finals Control Room ??
-                </button>
+                {settings.final_round_enabled ? (
+                  <div className="flex flex-col gap-2 mt-auto">
+                    <button onClick={() => setView('final_admin')} className="w-full py-2 text-xs font-bold uppercase text-amber-400 bg-amber-950/40 hover:bg-amber-900/50 border border-amber-900/50 rounded-lg transition">
+                      Resume Finals Control Room ??
+                    </button>
+                    <button onClick={async () => {
+                      if(window.confirm('End the final round? This will close the room for students but keep their scores safe.')) {
+                        await supabase.from('hub_settings').update({ final_round_enabled: false }).neq('id', 0);
+                        setSettings({...settings, final_round_enabled: false});
+                      }
+                    }} className="w-full py-1.5 text-[10px] font-bold uppercase text-red-400 hover:text-white bg-red-950/20 hover:bg-red-900/50 rounded transition">
+                      Terminate Finals Session
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={() => setView('final_setup')} className="w-full mt-auto py-2 text-xs font-bold uppercase text-amber-400 bg-amber-950/40 hover:bg-amber-900/50 border border-amber-900/50 rounded-lg transition">
+                    Configure & Launch New Finals ??
+                  </button>
+                )}
               </div>
 
-                <div className="flex items-center justify-between p-4 bg-slate-950 rounded-xl border border-slate-800">
+              <div className="flex items-center justify-between p-4 bg-slate-950 rounded-xl border border-slate-800">
                 <div className="flex items-center gap-3">
                   <div className={`p-2 rounded-lg ${settings.strategy_round_enabled ? 'bg-cyan-500/20 text-cyan-400' : 'bg-slate-800 text-slate-500'}`}><Brain className="w-5 h-5"/></div>
                   <div>

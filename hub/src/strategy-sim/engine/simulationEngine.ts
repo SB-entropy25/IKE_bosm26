@@ -16,7 +16,7 @@ export function createInitialRaceState(): RaceState {
   };
 }
 
-export function getLogicalEvent(state: RaceState, raceEvents: RaceEvent[]): RaceEvent {
+export function getLogicalEvent(state: RaceState, raceEvents: RaceEvent[], usedEvents: number[] = []): RaceEvent {
   // Find all events whose conditions are met
   let possibleEvents = raceEvents.filter(e => e.conditions(state));
   
@@ -73,3 +73,4 @@ export function processDecision(
 
   return { nextState, consequence };
 }
+
